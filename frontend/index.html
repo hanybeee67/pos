@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>에베레스트 POS — 한국어</title>
+  <meta name="description" content="에베레스트 레스토랑 그룹 자체 POS 시스템">
+  <meta name="theme-color" content="#0B1628">
+  <link rel="stylesheet" href="css/pos.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════
+     로딩 오버레이
+════════════════════════════════════════════════════════════ -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">데이터를 불러오는 중...</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     토스트 알림
+════════════════════════════════════════════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     화면 1: 로그인
+════════════════════════════════════════════════════════════ -->
+<div class="screen active" id="screen-login">
+  <div class="login-bg"></div>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="mountain">⛰️</div>
+      <div class="brand-ko">에베레스트 POS</div>
+      <div class="brand-sub">EVEREST RESTAURANT GROUP · v1.0</div>
+    </div>
+
+    <!-- 지점 선택 -->
+    <div class="login-branch-wrap">
+      <div class="login-label">지점 선택</div>
+      <select class="login-select" id="branch-select">
+        <option value="">-- 지점을 선택하세요 --</option>
+        <option value="1">동대문점</option>
+        <option value="2">영등포점</option>
+        <option value="3">동탄점</option>
+        <option value="4">양재점</option>
+        <option value="5">룸비니점</option>
+        <option value="6">강남점</option>
+        <option value="7">홍대점</option>
+        <option value="8">신촌점</option>
+        <option value="9">수원점</option>
+      </select>
+    </div>
+
+    <!-- PIN 입력 -->
+    <div class="pin-label">직원 PIN 4자리 입력</div>
+    <div class="pin-display" id="pin-display">
+      <div class="pin-dot" id="pin-dot-0"></div>
+      <div class="pin-dot" id="pin-dot-1"></div>
+      <div class="pin-dot" id="pin-dot-2"></div>
+      <div class="pin-dot" id="pin-dot-3"></div>
+    </div>
+
+    <!-- PIN 패드 -->
+    <div class="pin-pad" id="pin-pad">
+      <button class="pin-btn" data-val="1" onclick="pinInput('1')">1</button>
+      <button class="pin-btn" data-val="2" onclick="pinInput('2')">2</button>
+      <button class="pin-btn" data-val="3" onclick="pinInput('3')">3</button>
+      <button class="pin-btn" data-val="4" onclick="pinInput('4')">4</button>
+      <button class="pin-btn" data-val="5" onclick="pinInput('5')">5</button>
+      <button class="pin-btn" data-val="6" onclick="pinInput('6')">6</button>
+      <button class="pin-btn" data-val="7" onclick="pinInput('7')">7</button>
+      <button class="pin-btn" data-val="8" onclick="pinInput('8')">8</button>
+      <button class="pin-btn" data-val="9" onclick="pinInput('9')">9</button>
+      <button class="pin-btn del" onclick="pinDelete()">⌫</button>
+      <button class="pin-btn" data-val="0" onclick="pinInput('0')">0</button>
+      <button class="pin-btn confirm" onclick="pinConfirm()">확인</button>
+    </div>
+
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     화면 2~5: 메인 앱 (로그인 후)
+════════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-main">
+  <div class="app-wrapper">
+
+    <!-- 상단 헤더 -->
+    <div class="app-header">
+      <div class="header-left">
+        <span class="header-logo">⛰️</span>
+        <span class="header-branch" id="header-branch">동탄점</span>
+        <span class="header-staff" id="header-staff">직원</span>
+      </div>
+      <div class="header-right">
+        <div class="header-torder" id="torder-indicator">
+          <div class="torder-dot"></div>
+          T-Order 연동 중
+        </div>
+        <div class="header-time" id="header-time">00:00</div>
+        <button class="btn-icon" onclick="showView('view-closing')">📊 마감</button>
+        <button class="btn-icon danger" onclick="doLogout()">🔒 잠금</button>
+      </div>
+    </div>
+
+    <!-- 콘텐츠 영역 -->
+    <div class="app-content">
+
+      <!-- ── 뷰 1: 주문 입력 ─────────────────────────────────── -->
+      <div id="view-order" style="display:flex; width:100%;">
+
+        <!-- 메뉴 패널 (좌측) -->
+        <div class="menu-panel">
+          <!-- 카테고리 탭 -->
+          <div class="category-tabs" id="category-tabs">
+            <button class="cat-tab active" data-cat="all" onclick="filterCategory('all', this)">
+              <span class="cat-icon">🍽️</span> 전체
+            </button>
+            <!-- 카테고리는 JS에서 동적 생성 -->
+          </div>
+
+          <!-- 메뉴 그리드 -->
+          <div class="menu-grid" id="menu-grid">
+            <!-- JS에서 동적 생성 -->
+          </div>
+        </div>
+
+        <!-- 카트 패널 (우측) -->
+        <div class="cart-panel">
+
+          <!-- 테이블 / 주문 유형 선택 -->
+          <div class="table-selector">
+            <div class="select-label">주문 유형</div>
+            <div class="order-type-tabs">
+              <button class="otype-btn active" data-type="dine-in"  onclick="setOrderType('dine-in',  this)">홀</button>
+              <button class="otype-btn"        data-type="takeout"  onclick="setOrderType('takeout',  this)">포장</button>
+              <button class="otype-btn"        data-type="delivery" onclick="setOrderType('delivery', this)">배달</button>
+            </div>
+
+            <div class="selected-table-display" id="table-display" onclick="openTablePicker()">
+              <div>
+                <div class="tbl-no" id="selected-table-no">테이블 미선택</div>
+                <div class="tbl-hint">탭하여 테이블 선택</div>
+              </div>
+              <span style="color:var(--text3);">›</span>
+            </div>
+
+            <div class="person-count-row">
+              <span class="person-label">👥 인원 수</span>
+              <div class="person-ctrl">
+                <button class="person-btn" onclick="changePersonCount(-1)">−</button>
+                <span class="person-count" id="person-count">1</span>
+                <button class="person-btn" onclick="changePersonCount(1)">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 카트 아이템 목록 -->
+          <div class="cart-items" id="cart-items">
+            <div class="cart-empty" id="cart-empty">
+              <div class="cart-empty-icon">🛒</div>
+              <div class="cart-empty-text">메뉴를 선택해 주세요</div>
+            </div>
+          </div>
+
+          <!-- 카트 하단 (합계 + 버튼) -->
+          <div class="cart-footer">
+            <div class="cart-total-row">
+              <div>
+                <div class="cart-total-label">합계</div>
+                <div class="cart-item-count" id="cart-item-count">0개 항목</div>
+              </div>
+              <div class="cart-total-amount" id="cart-total">₩0</div>
+            </div>
+            <div class="cart-actions">
+              <button class="btn-order" onclick="clearCart()">🗑 초기화</button>
+              <button class="btn-pay" id="btn-pay" onclick="openPaymentModal()" disabled>
+                💳 결제
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 뷰 2: 테이블 배치도 ─────────────────────────────── -->
+      <div id="view-tables" class="hidden" style="width:100%; height:100%; overflow:hidden; display:flex; flex-direction:column;">
+
+        <div class="tables-topbar">
+          <div>
+            <h2>🗺️ 테이블 현황</h2>
+            <div style="font-size:11px; color:var(--text3); margin-top:2px;" id="tables-summary"></div>
+          </div>
+          <div class="table-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> 빈테이블</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div> 주문중</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--rose)"></div> 계산대기</div>
+          </div>
+        </div>
+
+        <div class="table-map" style="flex:1; overflow-y:auto; padding:16px;">
+          <div class="table-grid-layout" id="table-map-grid">
+            <!-- JS에서 동적 생성 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 뷰 3: 일 마감 ──────────────────────────────────── -->
+      <div id="view-closing" class="hidden" style="width:100%; height:100%; overflow-y:auto; padding:20px;">
+
+        <div class="closing-header">
+          <div>
+            <div class="closing-title">📊 일 마감 · 정산</div>
+            <div class="closing-date" id="closing-date-label"></div>
+          </div>
+          <button class="btn-icon" onclick="loadClosingData()">🔄 새로고침</button>
+        </div>
+
+        <!-- KPI 카드 -->
+        <div class="kpi-grid">
+          <div class="kpi-card teal">
+            <div class="kpi-icon">💰</div>
+            <div class="kpi-label">총 매출</div>
+            <div class="kpi-value teal" id="kpi-total">₩0</div>
+          </div>
+          <div class="kpi-card gold">
+            <div class="kpi-icon">💵</div>
+            <div class="kpi-label">현금 매출</div>
+            <div class="kpi-value gold" id="kpi-cash">₩0</div>
+          </div>
+          <div class="kpi-card blue">
+            <div class="kpi-icon">💳</div>
+            <div class="kpi-label">카드 매출</div>
+            <div class="kpi-value blue" id="kpi-card">₩0</div>
+          </div>
+          <div class="kpi-card rose">
+            <div class="kpi-icon">🧾</div>
+            <div class="kpi-label">주문 건수</div>
+            <div class="kpi-value rose" id="kpi-orders">0건</div>
+          </div>
+        </div>
+
+        <!-- 카테고리별 매출 -->
+        <div class="closing-section">
+          <div class="closing-section-title">카테고리별 매출</div>
+          <div id="category-sales">
+            <!-- JS에서 동적 생성 -->
+          </div>
+          <div class="closing-row total">
+            <span>합계</span>
+            <span class="amount teal" id="cat-total">₩0</span>
+          </div>
+        </div>
+
+        <!-- 연동 시스템 동기화 현황 -->
+        <div class="closing-section">
+          <div class="closing-section-title">연동 시스템 동기화</div>
+          <div class="sync-status-row">
+            <div class="sync-dot pending" id="sync-revenue-dot"></div>
+            <div class="sync-label">📊 재무관리 시스템 (매출 전송)</div>
+            <span class="chip chip-gold" id="sync-revenue-status">대기중</span>
+          </div>
+          <div class="sync-status-row">
+            <div class="sync-dot pending" id="sync-inventory-dot"></div>
+            <div class="sync-label">📦 재고관리 앱 (식재료 차감)</div>
+            <span class="chip chip-gold" id="sync-inventory-status">마감 시 자동처리</span>
+          </div>
+          <div class="sync-status-row">
+            <div class="sync-dot ok"></div>
+            <div class="sync-label">👥 멤버십 앱 (포인트 적립)</div>
+            <span class="chip chip-teal">결제마다 실시간</span>
+          </div>
+        </div>
+
+        <!-- 마감 실행 버튼 -->
+        <button class="btn-close-day" id="btn-close-day" onclick="executeDayClosing()">
+          📋 일 마감 실행 · 재무관리 자동 전송
+        </button>
+
+        <!-- 과거 마감 내역 -->
+        <div class="closing-section" style="margin-top:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div class="closing-section-title" style="border:none; margin:0;">최근 마감 내역</div>
+          </div>
+          <div id="closing-history">
+            <!-- JS에서 동적 생성 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 뷰 4: 메뉴 관리 (관리자) ──────────────────────── -->
+      <div id="view-admin" class="hidden" style="width:100%; height:100%; overflow-y:auto; padding:16px;">
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <h2 style="font-size:18px; font-weight:700;">⚙️ 메뉴 관리</h2>
+          <button class="btn-icon" style="background:var(--teal3); border-color:var(--teal); color:var(--teal);"
+                  onclick="openMenuEditor(null)">+ 메뉴 추가</button>
+        </div>
+
+        <div class="admin-tabs" id="admin-cat-tabs">
+          <button class="admin-tab active" data-cat="all" onclick="adminFilterCat('all', this)">전체</button>
+          <!-- JS에서 카테고리 탭 생성 -->
+        </div>
+
+        <div class="admin-menu-grid" id="admin-menu-grid">
+          <!-- JS에서 동적 생성 -->
+        </div>
+      </div>
+
+    </div><!-- /app-content -->
+
+    <!-- 하단 내비게이션 -->
+    <div class="app-nav">
+      <button class="nav-tab active" id="nav-order" onclick="showView('view-order')">
+        <span class="nav-icon">🏠</span>
+        주문
+      </button>
+      <button class="nav-tab" id="nav-tables" onclick="showView('view-tables')">
+        <span class="nav-icon">🗺️</span>
+        테이블
+        <span class="nav-badge" id="occupied-badge" style="display:none;"></span>
+      </button>
+      <button class="nav-tab" id="nav-closing" onclick="showView('view-closing')">
+        <span class="nav-icon">📊</span>
+        마감
+      </button>
+      <button class="nav-tab" id="nav-admin" onclick="showView('view-admin')">
+        <span class="nav-icon">⚙️</span>
+        관리
+      </button>
+    </div>
+
+  </div><!-- /app-wrapper -->
+</div><!-- /screen-main -->
+
+<!-- ════════════════════════════════════════════════════════════
+     결제 모달
+════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="payment-modal-overlay">
+  <div class="payment-modal">
+    <div class="modal-header">
+      <div class="modal-title">💳 결제</div>
+      <button class="modal-close" onclick="closePaymentModal()">✕</button>
+    </div>
+    <div class="payment-body">
+
+      <!-- 주문 요약 -->
+      <div class="order-summary-mini" id="payment-order-summary">
+        <!-- JS에서 채움 -->
+      </div>
+
+      <!-- 멤버십 조회 -->
+      <div class="membership-search">
+        <div style="font-size:11px; color:var(--text3); font-weight:600; margin-bottom:8px;">👥 멤버십 조회 (선택)</div>
+        <div class="membership-search-row">
+          <input type="tel" class="membership-input" id="member-phone" placeholder="전화번호 입력 (예: 01012345678)" maxlength="11">
+          <button class="btn-search" onclick="searchMember()">조회</button>
+        </div>
+        <div class="member-info" id="member-info">
+          <div class="member-name" id="member-name"></div>
+          <div class="member-points" id="member-points"></div>
+        </div>
+      </div>
+
+      <!-- 결제 수단 선택 -->
+      <div class="pay-method-tabs">
+        <button class="pay-method-tab active cash" data-method="cash" onclick="selectPayMethod('cash', this)">💵 현금</button>
+        <button class="pay-method-tab card" data-method="card" onclick="selectPayMethod('card', this)">💳 카드</button>
+        <button class="pay-method-tab mixed" data-method="mixed" onclick="selectPayMethod('mixed', this)">🔀 혼합</button>
+      </div>
+
+      <!-- 현금 결제 UI -->
+      <div id="cash-ui">
+        <div class="cash-input-wrap">
+          <div class="cash-input-label">받은 금액</div>
+          <input type="number" class="cash-input" id="cash-received-input" placeholder="0" oninput="calcChange()">
+        </div>
+        <div class="quick-cash-btns" id="quick-cash-btns">
+          <!-- JS에서 생성 -->
+        </div>
+        <div class="change-display">
+          <div class="change-label">거스름돈</div>
+          <div class="change-amount" id="change-amount">₩0</div>
+        </div>
+      </div>
+
+      <!-- 카드 결제 UI -->
+      <div id="card-ui" style="display:none;">
+        <div style="background:var(--card2); border-radius:var(--radius2); padding:16px; text-align:center; margin-bottom:14px;">
+          <div style="font-size:40px; margin-bottom:8px;">💳</div>
+          <div style="font-size:14px; color:var(--text2);">NICE VAN 카드 단말기로 결제해 주세요</div>
+          <div style="font-family:'DM Mono', monospace; font-size:20px; color:var(--teal); font-weight:700; margin-top:8px;" id="card-amount-display"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <div style="flex:1;">
+            <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">카드사</div>
+            <input type="text" class="membership-input" id="card-company" placeholder="예: 신한, 삼성...">
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">승인번호</div>
+            <input type="text" class="membership-input" id="card-approval-no" placeholder="승인번호 입력">
+          </div>
+        </div>
+      </div>
+
+      <!-- 혼합 결제 UI -->
+      <div id="mixed-ui" style="display:none;">
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <div style="flex:1;">
+            <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">현금</div>
+            <input type="number" class="membership-input" id="mixed-cash" placeholder="0" oninput="calcMixed()">
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">카드</div>
+            <input type="number" class="membership-input" id="mixed-card" placeholder="0" readonly>
+          </div>
+        </div>
+        <div style="font-size:11px; color:var(--text3); margin-bottom:14px;" id="mixed-info"></div>
+      </div>
+
+      <!-- 최종 결제 버튼 -->
+      <button class="btn-confirm-payment" id="btn-confirm-payment" onclick="confirmPayment()">
+        결제 완료
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     테이블 선택 모달
+════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="table-pick-overlay">
+  <div class="table-pick-modal">
+    <div class="modal-header">
+      <div class="modal-title">🗺️ 테이블 선택</div>
+      <button class="modal-close" onclick="closeTablePicker()">✕</button>
+    </div>
+    <div class="table-pick-grid" id="table-pick-grid">
+      <!-- JS에서 생성 -->
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     메뉴 편집 모달 (관리자)
+════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="menu-editor-overlay">
+  <div class="payment-modal" style="width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="menu-editor-title">메뉴 추가</div>
+      <button class="modal-close" onclick="closeMenuEditor()">✕</button>
+    </div>
+    <div class="payment-body">
+      <input type="hidden" id="edit-menu-id">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div>
+          <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">메뉴명 (한국어)</div>
+          <input type="text" class="membership-input" id="edit-name-ko" placeholder="예: 치킨 커리">
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">메뉴명 (영어)</div>
+          <input type="text" class="membership-input" id="edit-name-en" placeholder="예: Chicken Curry">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div>
+          <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">가격 (원)</div>
+          <input type="number" class="membership-input" id="edit-price" placeholder="0">
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">카테고리</div>
+          <select class="membership-input" id="edit-category" style="background:var(--card);">
+            <!-- JS에서 생성 -->
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px; color:var(--text3); margin-bottom:6px;">프린터 출력</div>
+        <div style="display:flex; gap:8px;">
+          <label style="display:flex; align-items:center; gap:5px; cursor:pointer; flex:1;
+                        background:var(--card2); border:1px solid var(--border2); border-radius:8px; padding:8px 12px;">
+            <input type="radio" name="printer" value="kitchen" checked> <span>주방 프린터</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:5px; cursor:pointer; flex:1;
+                        background:var(--card2); border:1px solid var(--border2); border-radius:8px; padding:8px 12px;">
+            <input type="radio" name="printer" value="bar"> <span>바 프린터</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:5px; cursor:pointer; flex:1;
+                        background:var(--card2); border:1px solid var(--border2); border-radius:8px; padding:8px 12px;">
+            <input type="radio" name="printer" value="both"> <span>양쪽</span>
+          </label>
+        </div>
+      </div>
+      <button class="btn-confirm-payment" style="background:linear-gradient(135deg,var(--blue),#3070d0);" onclick="saveMenu()">
+        저장
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     JavaScript
+════════════════════════════════════════════════════════════ -->
+<script>
+// ════════════════════════════════════════════════════════════
+// 전역 상태
+// ════════════════════════════════════════════════════════════
+const STATE = {
+  branch_id:    null,
+  branch_name:  '',
+  staff_id:     null,
+  staff_name:   '',
+  staff_role:   '',
+  token:        null,
+  orderType:    'dine-in',
+  selectedTable: null,   // { id, table_no }
+  personCount:  1,
+  cart:         [],      // [{ menu_id, name_ko, price, qty, note }]
+  menus:        [],      // 전체 메뉴 (카테고리 포함)
+  tables:       [],      // 테이블 목록
+  currentOrderId: null,
+  memberFound:  null,    // { id, name, points }
+  payMethod:    'cash',
+};
+
+const API_BASE = '';   // 같은 서버 → 상대경로
+
+// ════════════════════════════════════════════════════════════
+// 유틸
+// ════════════════════════════════════════════════════════════
+function fmt(n) {
+  return '₩' + (n || 0).toLocaleString('ko-KR');
+}
+function today() {
+  return new Date().toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit'
+  }).replace(/ /g,'').replace(/\./g,'-').replace(/-$/,'');
+}
+function todayISO() {
+  const d = new Date();
+  const tz = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  return tz;
+}
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => { t.className = 'toast'; }, 2800);
+}
+function showLoading(msg = '처리 중...') {
+  document.getElementById('loading-overlay').classList.add('active');
+  document.getElementById('loading-text').textContent = msg;
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('active');
+}
+async function apiFetch(path, options = {}) {
+  const opts = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(STATE.token ? { 'Authorization': `Bearer ${STATE.token}` } : {}),
+      ...(options.headers || {})
+    },
+    ...options
+  };
+  const res = await fetch(API_BASE + path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: '서버 오류' }));
+    throw new Error(err.error || '요청 실패');
+  }
+  return res.json();
+}
+
+// ════════════════════════════════════════════════════════════
+// 화면 전환
+// ════════════════════════════════════════════════════════════
+function switchScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showView(viewId) {
+  ['view-order','view-tables','view-closing','view-admin'].forEach(v => {
+    const el = document.getElementById(v);
+    if (el) el.style.display = 'none';
+  });
+  const target = document.getElementById(viewId);
+  if (target) target.style.display = 'flex';
+
+  // 내비 탭 활성화
+  const navMap = {
+    'view-order':   'nav-order',
+    'view-tables':  'nav-tables',
+    'view-closing': 'nav-closing',
+    'view-admin':   'nav-admin'
+  };
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const navId = navMap[viewId];
+  if (navId) {
+    const navEl = document.getElementById(navId);
+    if (navEl) navEl.classList.add('active');
+  }
+
+  if (viewId === 'view-tables')  loadTables();
+  if (viewId === 'view-closing') loadClosingData();
+  if (viewId === 'view-admin')   loadAdminMenus();
+}
+
+// ════════════════════════════════════════════════════════════
+// 로그인
+// ════════════════════════════════════════════════════════════
+let pinValue = '';
+
+function pinInput(digit) {
+  if (pinValue.length >= 4) return;
+  pinValue += digit;
+  updatePinDots();
+  if (pinValue.length === 4) setTimeout(pinConfirm, 150);
+}
+function pinDelete() {
+  pinValue = pinValue.slice(0, -1);
+  updatePinDots();
+}
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`pin-dot-${i}`).classList.toggle('filled', i < pinValue.length);
+  }
+}
+async function pinConfirm() {
+  const branchId = document.getElementById('branch-select').value;
+  if (!branchId) {
+    document.getElementById('login-error').textContent = '지점을 선택해 주세요.';
+    pinValue = ''; updatePinDots(); return;
+  }
+  if (pinValue.length < 4) {
+    document.getElementById('login-error').textContent = 'PIN 4자리를 입력해 주세요.';
+    return;
+  }
+  document.getElementById('login-error').textContent = '';
+  showLoading('로그인 중...');
+  try {
+    const data = await apiFetch('/api/auth/pin', {
+      method: 'POST',
+      body: JSON.stringify({ branch_id: parseInt(branchId), pin: pinValue })
+    });
+    STATE.token      = data.token;
+    STATE.branch_id  = data.staff.branch_id;
+    STATE.branch_name= data.staff.branch_name;
+    STATE.staff_id   = data.staff.id;
+    STATE.staff_name = data.staff.name_ko;
+    STATE.staff_role = data.staff.role;
+
+    document.getElementById('header-branch').textContent = STATE.branch_name;
+    document.getElementById('header-staff').textContent  = STATE.staff_name;
+
+    // 관리자 탭 권한 제어
+    const adminTab = document.getElementById('nav-admin');
+    if (!['admin','manager'].includes(STATE.staff_role)) {
+      adminTab.style.display = 'none';
+    }
+
+    await loadMenus();
+    switchScreen('screen-main');
+    showView('view-order');
+    startClock();
+    showToast(`${STATE.staff_name}님, 환영합니다! 🏔️`);
+  } catch (err) {
+    document.getElementById('login-error').textContent = err.message;
+    pinValue = ''; updatePinDots();
+    // 진동 피드백 (모바일)
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+  } finally {
+    hideLoading();
+  }
+}
+
+function doLogout() {
+  if (!confirm('잠금하시겠습니까?')) return;
+  pinValue = ''; updatePinDots();
+  STATE.token = null;
+  switchScreen('screen-login');
+}
+
+// ════════════════════════════════════════════════════════════
+// 시계
+// ════════════════════════════════════════════════════════════
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2,'0');
+    const m = now.getMinutes().toString().padStart(2,'0');
+    document.getElementById('header-time').textContent = `${h}:${m}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ════════════════════════════════════════════════════════════
+// 메뉴 로드 & 렌더링
+// ════════════════════════════════════════════════════════════
+async function loadMenus() {
+  showLoading('메뉴 불러오는 중...');
+  try {
+    const data = await apiFetch(`/api/menus?branch_id=${STATE.branch_id}`);
+    STATE.menus = data.categories;
+    renderCategoryTabs(data.categories);
+    renderMenuGrid(data.categories, 'all');
+    renderAdminCategoryTabs(data.categories);
+  } catch (err) {
+    console.error('메뉴 로드 실패:', err);
+    // 오프라인 폴백: 로컬 샘플 데이터 사용
+    loadOfflineMenus();
+  } finally {
+    hideLoading();
+  }
+}
+
+function loadOfflineMenus() {
+  const sampleCategories = [
+    { id:1, name_ko:'카레류', icon:'🍛', color:'#0ECFB1', menus:[
+      { id:1,  name_ko:'치킨 커리',    price:12000, is_sold_out:false },
+      { id:2,  name_ko:'양고기 커리',  price:14000, is_sold_out:false },
+      { id:3,  name_ko:'채소 커리',    price:11000, is_sold_out:false },
+      { id:4,  name_ko:'버터 치킨',    price:13000, is_sold_out:false },
+      { id:5,  name_ko:'달 커리',      price:10000, is_sold_out:false },
+      { id:6,  name_ko:'참치 커리',    price:13000, is_sold_out:false },
+    ]},
+    { id:2, name_ko:'밥 종류', icon:'🍚', color:'#F5A623', menus:[
+      { id:7,  name_ko:'필라우 라이스', price:4000, is_sold_out:false },
+      { id:8,  name_ko:'볶음밥',        price:7000, is_sold_out:false },
+      { id:9,  name_ko:'달밥',          price:10000, is_sold_out:false },
+    ]},
+    { id:3, name_ko:'탄두리', icon:'🍗', color:'#F5566B', menus:[
+      { id:10, name_ko:'탄두리 치킨',   price:15000, is_sold_out:false },
+      { id:11, name_ko:'탄두리 채소',   price:12000, is_sold_out:false },
+    ]},
+    { id:4, name_ko:'난 종류', icon:'🫓', color:'#8B6FE8', menus:[
+      { id:12, name_ko:'플레인 난',     price:3000, is_sold_out:false },
+      { id:13, name_ko:'마늘 난',       price:4000, is_sold_out:false },
+      { id:14, name_ko:'치즈 난',       price:5000, is_sold_out:false },
+    ]},
+    { id:5, name_ko:'음료', icon:'🥤', color:'#4B8EF5', menus:[
+      { id:15, name_ko:'라씨',          price:5000, is_sold_out:false },
+      { id:16, name_ko:'망고 라씨',     price:6000, is_sold_out:false },
+      { id:17, name_ko:'차이',          price:3000, is_sold_out:false },
+      { id:18, name_ko:'생수',          price:1000, is_sold_out:false },
+      { id:19, name_ko:'콜라',          price:3000, is_sold_out:false },
+    ]},
+    { id:7, name_ko:'세트메뉴', icon:'🍱', color:'#F5A623', menus:[
+      { id:20, name_ko:'1인 세트 A',   price:16000, is_sold_out:false },
+      { id:21, name_ko:'2인 세트 B',   price:29000, is_sold_out:false },
+    ]},
+  ];
+  STATE.menus = sampleCategories;
+  renderCategoryTabs(sampleCategories);
+  renderMenuGrid(sampleCategories, 'all');
+  renderAdminCategoryTabs(sampleCategories);
+}
+
+function renderCategoryTabs(categories) {
+  const container = document.getElementById('category-tabs');
+  container.innerHTML = `
+    <button class="cat-tab active" data-cat="all" onclick="filterCategory('all', this)">
+      <span class="cat-icon">🍽️</span> 전체
+    </button>
+  `;
+  categories.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-tab';
+    btn.dataset.cat = cat.id;
+    btn.onclick = () => filterCategory(cat.id, btn);
+    btn.innerHTML = `<span class="cat-icon">${cat.icon || '🍽️'}</span> ${cat.name_ko}`;
+    container.appendChild(btn);
+  });
+}
+
+function filterCategory(catId, btn) {
+  document.querySelectorAll('#category-tabs .cat-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderMenuGrid(STATE.menus, catId);
+}
+
+function renderMenuGrid(categories, filterCat) {
+  const grid = document.getElementById('menu-grid');
+  grid.innerHTML = '';
+
+  const catEmojis = {
+    '카레류':'🍛','밥 종류':'🍚','탄두리':'🍗','난 종류':'🫓',
+    '음료':'🥤','디저트':'🍮','세트메뉴':'🍱'
+  };
+
+  categories.forEach(cat => {
+    if (filterCat !== 'all' && String(cat.id) !== String(filterCat)) return;
+    (cat.menus || []).forEach(menu => {
+      const div = document.createElement('div');
+      div.className = 'menu-item' + (menu.is_sold_out ? ' sold-out' : '');
+      div.onclick = () => addToCart(menu);
+      div.innerHTML = `
+        <div class="menu-item-icon">${cat.icon || catEmojis[cat.name_ko] || '🍽️'}</div>
+        <div class="menu-item-name">${menu.name_ko}</div>
+        <div class="menu-item-price">${fmt(menu.price)}</div>
+      `;
+      grid.appendChild(div);
+    });
+  });
+
+  if (grid.children.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text3);">표시할 메뉴가 없습니다.</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 장바구니
+// ════════════════════════════════════════════════════════════
+function addToCart(menu) {
+  const existing = STATE.cart.find(i => i.menu_id === menu.id);
+  if (existing) {
+    existing.qty++;
+  } else {
+    STATE.cart.push({
+      menu_id: menu.id,
+      name_ko: menu.name_ko,
+      price:   menu.price,
+      qty:     1,
+      note:    ''
+    });
+  }
+  renderCart();
+  // 짧은 햅틱
+  if (navigator.vibrate) navigator.vibrate(30);
+}
+
+function changeQty(menuId, delta) {
+  const item = STATE.cart.find(i => i.menu_id === menuId);
+  if (!item) return;
+  item.qty += delta;
+  if (item.qty <= 0) {
+    STATE.cart = STATE.cart.filter(i => i.menu_id !== menuId);
+  }
+  renderCart();
+}
+
+function clearCart() {
+  if (STATE.cart.length === 0) return;
+  if (!confirm('장바구니를 초기화하시겠습니까?')) return;
+  STATE.cart = [];
+  STATE.selectedTable = null;
+  STATE.personCount = 1;
+  STATE.currentOrderId = null;
+  document.getElementById('selected-table-no').textContent = '테이블 미선택';
+  document.getElementById('person-count').textContent = '1';
+  renderCart();
+}
+
+function renderCart() {
+  const container = document.getElementById('cart-items');
+  const empty     = document.getElementById('cart-empty');
+  const totalEl   = document.getElementById('cart-total');
+  const countEl   = document.getElementById('cart-item-count');
+  const payBtn    = document.getElementById('btn-pay');
+
+  if (STATE.cart.length === 0) {
+    empty.style.display = 'flex';
+    container.querySelectorAll('.cart-item').forEach(e => e.remove());
+    totalEl.textContent = '₩0';
+    countEl.textContent = '0개 항목';
+    payBtn.disabled = true;
+    return;
+  }
+
+  empty.style.display = 'none';
+  container.querySelectorAll('.cart-item').forEach(e => e.remove());
+
+  let total = 0;
+  STATE.cart.forEach(item => {
+    total += item.price * item.qty;
+    const div = document.createElement('div');
+    div.className = 'cart-item';
+    div.innerHTML = `
+      <div class="cart-item-info">
+        <div class="cart-item-name">${item.name_ko}</div>
+        <div class="cart-item-price">${fmt(item.price)} × ${item.qty} = ${fmt(item.price * item.qty)}</div>
+      </div>
+      <div class="cart-qty-ctrl">
+        <button class="qty-btn del" onclick="changeQty(${item.menu_id}, -1)">−</button>
+        <span class="cart-qty">${item.qty}</span>
+        <button class="qty-btn" onclick="changeQty(${item.menu_id}, 1)">+</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+
+  totalEl.textContent = fmt(total);
+  const itemCount = STATE.cart.reduce((s,i) => s + i.qty, 0);
+  countEl.textContent = `${itemCount}개 항목`;
+  payBtn.disabled = false;
+}
+
+// ════════════════════════════════════════════════════════════
+// 주문 유형 & 테이블
+// ════════════════════════════════════════════════════════════
+function setOrderType(type, btn) {
+  STATE.orderType = type;
+  document.querySelectorAll('.otype-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const tableDisplay = document.getElementById('table-display');
+  if (type !== 'dine-in') {
+    tableDisplay.style.opacity = '0.4';
+    tableDisplay.style.pointerEvents = 'none';
+  } else {
+    tableDisplay.style.opacity = '1';
+    tableDisplay.style.pointerEvents = 'auto';
+  }
+}
+
+function changePersonCount(delta) {
+  STATE.personCount = Math.max(1, (STATE.personCount || 1) + delta);
+  document.getElementById('person-count').textContent = STATE.personCount;
+}
+
+function openTablePicker() {
+  loadTables(true);
+  document.getElementById('table-pick-overlay').classList.add('active');
+}
+function closeTablePicker() {
+  document.getElementById('table-pick-overlay').classList.remove('active');
+}
+
+function selectTable(table) {
+  STATE.selectedTable = table;
+  document.getElementById('selected-table-no').textContent = `${table.table_no}번 테이블`;
+  closeTablePicker();
+}
+
+// ════════════════════════════════════════════════════════════
+// 테이블 로드 & 렌더링
+// ════════════════════════════════════════════════════════════
+async function loadTables(forPicker = false) {
+  try {
+    const data = await apiFetch(`/api/tables?branch_id=${STATE.branch_id}`);
+    STATE.tables = data;
+    renderTableMap(data);
+    if (forPicker) renderTablePicker(data);
+    updateOccupiedBadge(data);
+  } catch (err) {
+    // 오프라인: 샘플 테이블
+    const sample = Array.from({length:12}, (_,i) => ({
+      id: i+1, table_no: String(i+1), floor:'1층', seat_count:4,
+      status: i < 8 ? 'empty' : (i < 10 ? 'occupied' : 'checkout')
+    }));
+    STATE.tables = sample;
+    renderTableMap(sample);
+    if (forPicker) renderTablePicker(sample);
+    updateOccupiedBadge(sample);
+  }
+}
+
+function updateOccupiedBadge(tables) {
+  const n = tables.filter(t => t.status === 'occupied' || t.status === 'checkout').length;
+  const badge = document.getElementById('occupied-badge');
+  if (n > 0) { badge.style.display = 'flex'; badge.textContent = n; }
+  else        { badge.style.display = 'none'; }
+
+  // 배치도 요약
+  const empty    = tables.filter(t => t.status === 'empty').length;
+  const occupied = tables.filter(t => t.status === 'occupied').length;
+  const checkout = tables.filter(t => t.status === 'checkout').length;
+  const summary = document.getElementById('tables-summary');
+  if (summary) summary.textContent = `빈테이블 ${empty}  |  주문중 ${occupied}  |  계산대기 ${checkout}`;
+}
+
+function renderTableMap(tables) {
+  const grid = document.getElementById('table-map-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  tables.forEach(t => {
+    const div = document.createElement('div');
+    div.className = `table-card ${t.status}`;
+    div.onclick = () => tableCardClick(t);
+    const elapsed = t.order_started
+      ? getElapsedMin(t.order_started) + '분'
+      : '';
+    div.innerHTML = `
+      <div class="table-status-dot"></div>
+      ${t.source === 'torder' ? '<div class="table-source">T</div>' : ''}
+      <div class="table-num">${t.table_no}</div>
+      <div class="table-label">${t.seat_count}인석</div>
+      ${elapsed ? `<div class="table-time">${elapsed}</div>` : ''}
+      ${t.status === 'occupied' || t.status === 'checkout' ? '<div class="table-amount">주문중</div>' : ''}
+    `;
+    grid.appendChild(div);
+  });
+}
+
+function tableCardClick(table) {
+  if (table.status === 'empty') {
+    STATE.selectedTable = table;
+    document.getElementById('selected-table-no').textContent = `${table.table_no}번 테이블`;
+    showView('view-order');
+    showToast(`${table.table_no}번 테이블 선택됨`);
+  } else {
+    // 주문 중인 테이블 → 주문 이어서
+    STATE.selectedTable = table;
+    document.getElementById('selected-table-no').textContent = `${table.table_no}번 테이블`;
+    showView('view-order');
+    showToast(`${table.table_no}번 테이블 이어서 주문`);
+  }
+}
+
+function renderTablePicker(tables) {
+  const grid = document.getElementById('table-pick-grid');
+  grid.innerHTML = '';
+  tables.forEach(t => {
+    const div = document.createElement('div');
+    div.className = `table-pick-btn ${t.status}`;
+    div.onclick = () => { selectTable(t); };
+    div.innerHTML = `
+      <div class="tp-num">${t.table_no}</div>
+      <div class="tp-status">${
+        t.status === 'empty' ? '빈 자리' :
+        t.status === 'occupied' ? '주문중' : '계산대기'
+      }</div>
+    `;
+    grid.appendChild(div);
+  });
+}
+
+function getElapsedMin(isoStr) {
+  const diff = Date.now() - new Date(isoStr).getTime();
+  return Math.floor(diff / 60000);
+}
+
+// ════════════════════════════════════════════════════════════
+// 결제 모달
+// ════════════════════════════════════════════════════════════
+function openPaymentModal() {
+  if (STATE.cart.length === 0) return;
+
+  // 주문 요약 채우기
+  const summary = document.getElementById('payment-order-summary');
+  let html = '';
+  let total = 0;
+  STATE.cart.forEach(item => {
+    const lineTotal = item.price * item.qty;
+    total += lineTotal;
+    html += `
+      <div class="order-summary-item">
+        <span>${item.name_ko} × ${item.qty}</span>
+        <span style="font-family:'DM Mono',monospace;">${fmt(lineTotal)}</span>
+      </div>
+    `;
+  });
+  html += `
+    <div class="order-summary-total">
+      <span class="label">합계</span>
+      <span class="amount">${fmt(total)}</span>
+    </div>
+  `;
+  summary.innerHTML = html;
+
+  // 카드 금액 표시 업데이트
+  document.getElementById('card-amount-display').textContent = fmt(total);
+
+  // 빠른현금 버튼 생성
+  generateQuickCashBtns(total);
+
+  // 혼합결제 초기화
+  document.getElementById('mixed-info').textContent = `결제 금액: ${fmt(total)}`;
+
+  // 멤버십 초기화
+  document.getElementById('member-phone').value = '';
+  document.getElementById('member-info').classList.remove('found');
+  STATE.memberFound = null;
+
+  // 현금 기본 선택
+  selectPayMethod('cash', document.querySelector('.pay-method-tab.cash'));
+
+  document.getElementById('payment-modal-overlay').classList.add('active');
+  document.getElementById('cash-received-input').focus();
+}
+
+function closePaymentModal() {
+  document.getElementById('payment-modal-overlay').classList.remove('active');
+}
+
+function generateQuickCashBtns(total) {
+  const container = document.getElementById('quick-cash-btns');
+  const rounds = [
+    Math.ceil(total / 1000) * 1000,
+    Math.ceil(total / 5000) * 5000,
+    Math.ceil(total / 10000) * 10000,
+    50000, 100000
+  ].filter((v, i, a) => v > total && a.indexOf(v) === i).slice(0, 5);
+
+  container.innerHTML = rounds.map(v =>
+    `<button class="quick-cash-btn" onclick="setCashReceived(${v})">${fmt(v)}</button>`
+  ).join('');
+}
+
+function setCashReceived(amount) {
+  document.getElementById('cash-received-input').value = amount;
+  calcChange();
+}
+
+function calcChange() {
+  const total    = getCartTotal();
+  const received = parseInt(document.getElementById('cash-received-input').value) || 0;
+  const change   = received - total;
+  document.getElementById('change-amount').textContent = change >= 0 ? fmt(change) : '부족';
+  document.getElementById('change-amount').style.color =
+    change >= 0 ? 'var(--teal)' : 'var(--rose)';
+}
+
+function calcMixed() {
+  const total    = getCartTotal();
+  const cashAmt  = parseInt(document.getElementById('mixed-cash').value) || 0;
+  const cardAmt  = Math.max(0, total - cashAmt);
+  document.getElementById('mixed-card').value = cardAmt;
+  document.getElementById('mixed-info').textContent =
+    `현금 ${fmt(cashAmt)} + 카드 ${fmt(cardAmt)} = ${fmt(total)}`;
+}
+
+function selectPayMethod(method, btn) {
+  STATE.payMethod = method;
+  document.querySelectorAll('.pay-method-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('cash-ui').style.display = method === 'cash'  ? 'block' : 'none';
+  document.getElementById('card-ui').style.display = method === 'card'  ? 'block' : 'none';
+  document.getElementById('mixed-ui').style.display = method === 'mixed' ? 'block' : 'none';
+}
+
+async function searchMember() {
+  const phone = document.getElementById('member-phone').value.trim();
+  if (!phone || phone.length < 10) {
+    showToast('전화번호를 정확히 입력해 주세요.', true); return;
+  }
+  try {
+    const data = await apiFetch(`/api/members?phone=${phone}`);
+    STATE.memberFound = data;
+    document.getElementById('member-name').textContent = data.name || '이름 미등록';
+    document.getElementById('member-points').textContent =
+      `포인트: ${data.points?.toLocaleString()}pt  |  쿠폰: ${data.coupons?.length || 0}개`;
+    document.getElementById('member-info').classList.add('found');
+    showToast(`${data.name || '회원'} 조회됨 — ${data.points}pt`);
+  } catch (err) {
+    document.getElementById('member-info').classList.remove('found');
+    STATE.memberFound = null;
+    if (err.message.includes('찾을 수 없습니다')) {
+      if (confirm('미등록 회원입니다. 새로 등록하시겠습니까?')) {
+        registerNewMember(phone);
+      }
+    } else {
+      showToast(err.message, true);
+    }
+  }
+}
+
+async function registerNewMember(phone) {
+  const name = prompt('회원 이름을 입력하세요 (선택사항):');
+  try {
+    const data = await apiFetch('/api/members', {
+      method: 'POST',
+      body: JSON.stringify({ phone, name: name || null })
+    });
+    STATE.memberFound = { ...data, coupons: [] };
+    document.getElementById('member-name').textContent = data.name || '신규 회원';
+    document.getElementById('member-points').textContent = '포인트: 0pt';
+    document.getElementById('member-info').classList.add('found');
+    showToast('신규 회원 등록 완료!');
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+function getCartTotal() {
+  return STATE.cart.reduce((s, i) => s + i.price * i.qty, 0);
+}
+
+async function confirmPayment() {
+  const total = getCartTotal();
+  const method = STATE.payMethod;
+
+  // 유효성 검사
+  if (method === 'cash') {
+    const received = parseInt(document.getElementById('cash-received-input').value) || 0;
+    if (received < total) {
+      showToast('받은 금액이 부족합니다.', true); return;
+    }
+  }
+
+  const btn = document.getElementById('btn-confirm-payment');
+  btn.disabled = true;
+  btn.textContent = '처리 중...';
+
+  try {
+    // 1. 주문 생성 (아직 주문이 없는 경우)
+    let orderId = STATE.currentOrderId;
+    if (!orderId) {
+      const orderData = await apiFetch('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          branch_id:    STATE.branch_id,
+          table_id:     STATE.selectedTable?.id || null,
+          order_type:   STATE.orderType,
+          source:       'pos',
+          person_count: STATE.personCount,
+          staff_id:     STATE.staff_id,
+          items: STATE.cart.map(i => ({
+            menu_id: i.menu_id,
+            qty:     i.qty,
+            note:    i.note || ''
+          }))
+        })
+      });
+      orderId = orderData.id;
+      STATE.currentOrderId = orderId;
+    }
+
+    // 2. 결제 처리
+    const cashReceived = parseInt(document.getElementById('cash-received-input').value) || 0;
+    const cardApproval = document.getElementById('card-approval-no').value;
+    const cardCompany  = document.getElementById('card-company').value;
+    const mixedCash    = parseInt(document.getElementById('mixed-cash').value) || 0;
+    const mixedCard    = parseInt(document.getElementById('mixed-card').value) || 0;
+
+    const payBody = {
+      order_id:      orderId,
+      branch_id:     STATE.branch_id,
+      method,
+      total_amount:  total,
+      cash_amount:   method === 'cash' ? total : (method === 'mixed' ? mixedCash : 0),
+      cash_received: method === 'cash' ? cashReceived : 0,
+      card_amount:   method === 'card' ? total : (method === 'mixed' ? mixedCard : 0),
+      card_approval_no: method !== 'cash' ? cardApproval : null,
+      card_company:  method !== 'cash' ? cardCompany : null,
+      member_id:     STATE.memberFound?.id || null,
+      staff_id:      STATE.staff_id
+    };
+
+    if (method === 'mixed') {
+      payBody.split_payments = [
+        { method: 'cash', amount: mixedCash },
+        { method: 'card', amount: mixedCard, card_approval_no: cardApproval }
+      ];
+    }
+
+    const payResult = await apiFetch('/api/payments', {
+      method: 'POST',
+      body: JSON.stringify(payBody)
+    });
+
+    // 3. 성공 처리
+    closePaymentModal();
+    const change = payResult.change || 0;
+    let successMsg = `결제 완료! ${fmt(total)}`;
+    if (method === 'cash' && change > 0) successMsg += ` — 거스름돈: ${fmt(change)}`;
+
+    showToast(successMsg);
+
+    // 카트 초기화
+    STATE.cart = [];
+    STATE.currentOrderId = null;
+    STATE.selectedTable = null;
+    STATE.personCount = 1;
+    document.getElementById('selected-table-no').textContent = '테이블 미선택';
+    document.getElementById('person-count').textContent = '1';
+    renderCart();
+
+  } catch (err) {
+    showToast(`결제 실패: ${err.message}`, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '결제 완료';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 일 마감
+// ════════════════════════════════════════════════════════════
+async function loadClosingData() {
+  const dateLabel = document.getElementById('closing-date-label');
+  dateLabel.textContent = `영업일: ${todayISO()} (${today()})`;
+
+  try {
+    const payments = await apiFetch(`/api/payments?branch_id=${STATE.branch_id}&date=${todayISO()}`);
+
+    let total = 0, cash = 0, card = 0, orders = new Set();
+    const catMap = {};
+
+    payments.forEach(p => {
+      total += p.total_amount;
+      cash  += p.cash_amount;
+      card  += p.card_amount;
+      orders.add(p.order_id);
+    });
+
+    document.getElementById('kpi-total').textContent  = fmt(total);
+    document.getElementById('kpi-cash').textContent   = fmt(cash);
+    document.getElementById('kpi-card').textContent   = fmt(card);
+    document.getElementById('kpi-orders').textContent = `${orders.size}건`;
+    document.getElementById('cat-total').textContent  = fmt(total);
+
+    // 카테고리별 매출 (간략 — 실제는 API에서 집계)
+    document.getElementById('category-sales').innerHTML =
+      '<div class="closing-row"><span style="color:var(--text3)">마감 실행 후 카테고리별 명세가 표시됩니다.</span><span></span></div>';
+
+    // 마감 내역
+    loadClosingHistory();
+  } catch (err) {
+    // 오프라인 or 오류
+    document.getElementById('kpi-total').textContent  = '오프라인';
+    document.getElementById('kpi-cash').textContent   = '--';
+    document.getElementById('kpi-card').textContent   = '--';
+    document.getElementById('kpi-orders').textContent = '--';
+  }
+}
+
+async function loadClosingHistory() {
+  try {
+    const history = await apiFetch(`/api/closing/history?branch_id=${STATE.branch_id}&limit=10`);
+    const container = document.getElementById('closing-history');
+    if (!history.length) {
+      container.innerHTML = '<div class="closing-row"><span style="color:var(--text3)">마감 내역이 없습니다.</span></div>';
+      return;
+    }
+    container.innerHTML = history.map(h => `
+      <div class="closing-row">
+        <span>${h.date}</span>
+        <span class="amount teal">${fmt(h.total_amount)}</span>
+        <span style="font-size:11px; color:var(--text3);">${h.order_count}건</span>
+        <span class="chip ${h.is_synced_revenue ? 'chip-teal' : 'chip-gold'}" style="font-size:10px;">
+          ${h.is_synced_revenue ? '동기화됨' : '미동기화'}
+        </span>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('마감 내역 로드 실패:', err);
+  }
+}
+
+async function executeDayClosing() {
+  if (!confirm(`${todayISO()} 일 마감을 실행하시겠습니까?\n재무관리 시스템으로 매출이 자동 전송됩니다.`)) return;
+
+  const btn = document.getElementById('btn-close-day');
+  btn.disabled = true;
+  btn.textContent = '마감 처리 중...';
+
+  try {
+    const result = await apiFetch('/api/closing/daily', {
+      method: 'POST',
+      body: JSON.stringify({
+        branch_id: STATE.branch_id,
+        date:      todayISO(),
+        staff_id:  STATE.staff_id
+      })
+    });
+
+    showToast(`일 마감 완료! 총 매출: ${fmt(result.summary.total_amount)}`);
+
+    // 동기화 상태 표시
+    const dot = document.getElementById('sync-revenue-dot');
+    const status = document.getElementById('sync-revenue-status');
+    if (result.revenue_synced) {
+      dot.className = 'sync-dot ok';
+      status.className = 'chip chip-teal';
+      status.textContent = '동기화 완료';
+    } else {
+      dot.className = 'sync-dot error';
+      status.className = 'chip chip-rose';
+      status.textContent = '동기화 실패';
+    }
+
+    loadClosingData();
+  } catch (err) {
+    showToast(`마감 실패: ${err.message}`, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📋 일 마감 실행 · 재무관리 자동 전송';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 메뉴 관리 (관리자)
+// ════════════════════════════════════════════════════════════
+let adminCatFilter = 'all';
+
+function renderAdminCategoryTabs(categories) {
+  const tabs = document.getElementById('admin-cat-tabs');
+  tabs.innerHTML = `<button class="admin-tab active" data-cat="all" onclick="adminFilterCat('all', this)">전체</button>`;
+  categories.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'admin-tab';
+    btn.dataset.cat = cat.id;
+    btn.onclick = () => adminFilterCat(cat.id, btn);
+    btn.textContent = cat.name_ko;
+    tabs.appendChild(btn);
+  });
+}
+
+function adminFilterCat(catId, btn) {
+  adminCatFilter = catId;
+  document.querySelectorAll('#admin-cat-tabs .admin-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderAdminMenuGrid();
+}
+
+function loadAdminMenus() {
+  renderAdminMenuGrid();
+}
+
+function renderAdminMenuGrid() {
+  const grid = document.getElementById('admin-menu-grid');
+  grid.innerHTML = '';
+  STATE.menus.forEach(cat => {
+    if (adminCatFilter !== 'all' && String(cat.id) !== String(adminCatFilter)) return;
+    (cat.menus || []).forEach(menu => {
+      const div = document.createElement('div');
+      div.className = 'admin-menu-card';
+      div.innerHTML = `
+        <div class="admin-menu-name">${menu.name_ko}</div>
+        <div class="admin-menu-price">${fmt(menu.price)}</div>
+        <div class="admin-menu-meta">
+          <span class="chip chip-teal">${cat.name_ko}</span>
+          ${menu.is_sold_out ? '<span class="chip chip-rose">품절</span>' : ''}
+          <span style="color:var(--text3);">${menu.printer_target === 'bar' ? '🥤바' : '🍳주방'}</span>
+        </div>
+        <div class="admin-menu-actions">
+          <button class="btn-sm edit" onclick="openMenuEditor(${JSON.stringify(menu).replace(/"/g,'&quot;')})">수정</button>
+          <button class="btn-sm soldout ${menu.is_sold_out ? 'active' : ''}"
+                  onclick="toggleSoldOut(${menu.id}, ${!menu.is_sold_out}, this)">
+            ${menu.is_sold_out ? '판매재개' : '품절처리'}
+          </button>
+          <button class="btn-sm del" onclick="deleteMenu(${menu.id})">삭제</button>
+        </div>
+      `;
+      grid.appendChild(div);
+    });
+  });
+  if (grid.children.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1; color:var(--text3); text-align:center; padding:40px;">표시할 메뉴가 없습니다.</div>';
+  }
+}
+
+function openMenuEditor(menu) {
+  document.getElementById('menu-editor-overlay').classList.add('active');
+  const isEdit = menu && menu.id;
+  document.getElementById('menu-editor-title').textContent = isEdit ? '메뉴 수정' : '메뉴 추가';
+  document.getElementById('edit-menu-id').value  = isEdit ? menu.id : '';
+  document.getElementById('edit-name-ko').value  = isEdit ? menu.name_ko : '';
+  document.getElementById('edit-name-en').value  = isEdit ? (menu.name_en || '') : '';
+  document.getElementById('edit-price').value    = isEdit ? menu.price : '';
+
+  // 카테고리 옵션
+  const sel = document.getElementById('edit-category');
+  sel.innerHTML = '';
+  STATE.menus.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.name_ko;
+    if (isEdit && menu.category_id == cat.id) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  // 프린터 라디오
+  const printerVal = isEdit ? (menu.printer_target || 'kitchen') : 'kitchen';
+  document.querySelectorAll('input[name="printer"]').forEach(r => {
+    r.checked = r.value === printerVal;
+  });
+}
+function closeMenuEditor() {
+  document.getElementById('menu-editor-overlay').classList.remove('active');
+}
+
+async function saveMenu() {
+  const id       = document.getElementById('edit-menu-id').value;
+  const name_ko  = document.getElementById('edit-name-ko').value.trim();
+  const name_en  = document.getElementById('edit-name-en').value.trim();
+  const price    = parseInt(document.getElementById('edit-price').value);
+  const category_id = document.getElementById('edit-category').value;
+  const printer  = document.querySelector('input[name="printer"]:checked')?.value || 'kitchen';
+
+  if (!name_ko || !price || !category_id) {
+    showToast('메뉴명, 가격, 카테고리는 필수입니다.', true); return;
+  }
+
+  try {
+    const body = { name_ko, name_en, price, category_id: parseInt(category_id), printer_target: printer };
+    if (id) {
+      await apiFetch(`/api/menus/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      showToast('메뉴가 수정되었습니다.');
+    } else {
+      await apiFetch('/api/menus', { method: 'POST', body: JSON.stringify(body) });
+      showToast('메뉴가 추가되었습니다.');
+    }
+    closeMenuEditor();
+    await loadMenus();
+    renderAdminMenuGrid();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+async function toggleSoldOut(menuId, soldOut, btn) {
+  try {
+    await apiFetch(`/api/menus/${menuId}/soldout`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_sold_out: soldOut })
+    });
+    showToast(soldOut ? '품절 처리되었습니다.' : '판매 재개되었습니다.');
+    await loadMenus();
+    renderAdminMenuGrid();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+async function deleteMenu(menuId) {
+  if (!confirm('이 메뉴를 삭제(비활성화)하시겠습니까?')) return;
+  try {
+    await apiFetch(`/api/menus/${menuId}`, { method: 'DELETE' });
+    showToast('메뉴가 삭제되었습니다.');
+    await loadMenus();
+    renderAdminMenuGrid();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 초기화 (오프라인 지원)
+// ════════════════════════════════════════════════════════════
+(function init() {
+  // 개발 중 로컬 테스트: API 연결 없이 바로 진입 (URL 파라미터 ?demo=1)
+  const params = new URLSearchParams(location.search);
+  if (params.get('demo') === '1') {
+    STATE.token      = 'demo';
+    STATE.branch_id  = 3;
+    STATE.branch_name= '동탄점';
+    STATE.staff_id   = 1;
+    STATE.staff_name = '홍길동';
+    STATE.staff_role = 'admin';
+    document.getElementById('header-branch').textContent = '동탄점';
+    document.getElementById('header-staff').textContent  = '홍길동';
+    loadOfflineMenus();
+    switchScreen('screen-main');
+    showView('view-order');
+    startClock();
+    showToast('데모 모드로 실행 중 🏔️');
+    return;
+  }
+
+  // 초기 화면: 전체 보기 중 view-order만 flex, 나머지 hidden
+  ['view-tables','view-closing','view-admin'].forEach(v => {
+    document.getElementById(v).style.display = 'none';
+  });
+})();
+</script>
+</body>
+</html>
