@@ -1810,6 +1810,10 @@ function openPaymentModal() {
   // 혼합결제 초기화
   document.getElementById('mixed-info').textContent = `결제 금액: ${fmt(total)}`;
 
+  // 현금 기본 세팅 (받은 금액을 결제 금액으로 채워둠)
+  document.getElementById('cash-received-input').value = total;
+  calcChange();
+
   // 멤버십 초기화
   document.getElementById('member-phone').value = '';
   document.getElementById('member-info').classList.remove('found');
