@@ -1724,3 +1724,54 @@ body {
 }
 
 .tdp-btn-icon { font-size: 18px; line-height: 1; }
+
+/* ================================================================
+   주문 버튼 (cart-footer)
+   ================================================================ */
+.btn-submit-order {
+  flex: 1;
+  background: linear-gradient(135deg, #1A7A4A 0%, #148040 100%);
+  border: none;
+  border-radius: var(--radius2);
+  padding: 13px;
+  font-size: 15px; font-weight: 700; color: #fff;
+  cursor: pointer; font-family: 'Noto Sans KR', sans-serif;
+  transition: all var(--transition);
+  box-shadow: 0 4px 14px rgba(20,128,64,0.35);
+  letter-spacing: 0.5px;
+}
+.btn-submit-order:hover  { opacity: 0.88; transform: translateY(-1px); }
+.btn-submit-order:active { transform: scale(0.98); }
+.btn-submit-order:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ================================================================
+   테이블 카드 주문 요약 (OKPOS 스타일)
+   ================================================================ */
+.tc-order-wrap {
+  width: 100%;
+  text-align: left;
+  margin-top: 3px;
+}
+.tc-first-item {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 88px;
+  line-height: 1.3;
+}
+.tc-more {
+  font-size: 9px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+.tc-total {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--gold);
+  text-align: right;
+  margin-top: 3px;
+}

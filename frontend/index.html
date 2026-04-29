@@ -176,7 +176,9 @@
               <div class="cart-total-amount" id="cart-total">₩0</div>
             </div>
             <div class="cart-actions">
-              <button class="btn-order" onclick="clearCart()">🗑 초기화</button>
+              <button class="btn-submit-order" id="btn-submit-order" onclick="submitOrder()" disabled>
+                📋 주문
+              </button>
               <button class="btn-pay" id="btn-pay" onclick="openPaymentModal()" disabled>
                 💳 결제
               </button>
@@ -1291,6 +1293,135 @@ function changeQty(menuId, delta) {
   renderCart();
 }
 
+// ════════════════════════════════════════════════════════════
+// 주문 전송 (주문 버튼)
+// ════════════════════════════════════════════════════════════
+async function submitOrder() {
+  if (STATE.cart.length === 0) {
+    showToast('메뉴를 선택해 주세요.', true);
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit-order');
+  if (btn) { btn.disabled = true; btn.textContent = '전송 중...'; }
+
+  try {
+    let result;
+    if (STATE.currentOrderId) {
+      // 이미 주문이 있는 테이블 → 추가 주문
+      result = await apiFetch(`/api/orders/${STATE.currentOrderId}/items`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          items: STATE.cart.map(i => ({ menu_id: i.menu_id, qty: i.qty, note: i.note || '' }))
+        })
+      });
+      showToast('✅ 추가 주문 전송됨');
+    } else {
+      // 새 주문 생성
+      result = await apiFetch('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          branch_id:    STATE.branch_id,
+          table_id:     STATE.selectedTable?.id || null,
+          order_type:   STATE.orderType,
+          source:       'pos',
+          person_count: STATE.personCount,
+          staff_id:     STATE.staff_id,
+          items: STATE.cart.map(i => ({ menu_id: i.menu_id, qty: i.qty, note: i.note || '' }))
+        })
+      });
+      STATE.currentOrderId = result.id;
+      showToast('✅ 주문 전송됨');
+    }
+
+    // 테이블 카드에 주문 요약 반영
+    if (STATE.selectedTable) {
+      const t = STATE.tables.find(t => t.id === STATE.selectedTable.id);
+      if (t) {
+        t.status = 'occupied';
+        t.current_order_id = STATE.currentOrderId;
+        const total = STATE.cart.reduce((s, i) => s + i.price * i.qty, 0);
+        const first = STATE.cart[0]?.name_ko || '';
+        const more  = STATE.cart.reduce((s, i) => s + i.qty, 0) - (STATE.cart[0]?.qty || 0);
+        t._orderSummary = { first, more, total };
+        // 배치도에 있다면 리렌더
+        if (document.getElementById('view-tables').style.display !== 'none') {
+          renderFloorPlan();
+        }
+        updateOccupiedBadge(STATE.tables);
+      }
+    }
+
+    // 주방 주문서 프린트
+    printKitchenOrder(STATE.selectedTable, STATE.cart);
+
+    // 주문 후 장바구니 유지 (추가주문 가능하도록)
+    // 필요시 초기화: STATE.cart = []; renderCart();
+
+  } catch (err) {
+    showToast('주문 실패: ' + err.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '📋 주문'; }
+  }
+}
+
+/** 주방 주문서 프린트 */
+function printKitchenOrder(table, items) {
+  const tableNo  = table?.table_no || '—';
+  const staffName = STATE.staff_name || '';
+  const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false });
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const rows = items.map(i => `
+    <tr>
+      <td style="padding:4px 8px;font-size:14px;">${i.name_ko}</td>
+      <td style="padding:4px 8px;font-size:14px;text-align:center;font-weight:700;">${i.qty}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head>
+  <meta charset="UTF-8">
+  <title>주방 주문서</title>
+  <style>
+    body { font-family: 'Noto Sans KR', monospace; margin: 0; padding: 12px; font-size: 13px; color: #000; }
+    h2   { text-align:center; font-size: 18px; margin: 0 0 6px; letter-spacing:1px; }
+    .meta { text-align:center; font-size:12px; color:#444; margin-bottom:10px; }
+    hr   { border:none; border-top:2px solid #000; margin:8px 0; }
+    .table-no { font-size:28px; font-weight:900; text-align:center; margin:8px 0; }
+    table { width:100%; border-collapse:collapse; }
+    th   { font-size:12px; color:#555; border-bottom:1px solid #000; padding:4px 8px; text-align:left; }
+    th:last-child { text-align:center; }
+    @media print {
+      body { margin:0; }
+      button { display:none; }
+    }
+  </style>
+</head><body>
+  <h2>⛰️ 에베레스트</h2>
+  <div class="meta">${now} · ${staffName}</div>
+  <hr>
+  <div class="table-no">TABLE ${tableNo}</div>
+  <hr>
+  <table>
+    <thead><tr><th>메뉴</th><th style="text-align:center;">수량</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <hr>
+  <div style="text-align:right;font-size:13px;">합계: <strong>${fmt(total)}</strong></div>
+  <br>
+  <button onclick="window.print()" style="width:100%;padding:10px;font-size:14px;cursor:pointer;">🖨️ 인쇄</button>
+  <script>window.onload=()=>{ setTimeout(()=>window.print(),300); }<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank', 'width=380,height=600');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+  } else {
+    showToast('팝업 차단됨 — 브라우저에서 팝업을 허용해 주세요.', true);
+  }
+}
+
 function clearCart() {
   if (STATE.cart.length === 0) return;
   if (!confirm('장바구니를 초기화하시겠습니까?')) return;
@@ -1309,6 +1440,7 @@ function renderCart() {
   const totalEl   = document.getElementById('cart-total');
   const countEl   = document.getElementById('cart-item-count');
   const payBtn    = document.getElementById('btn-pay');
+  const orderBtn  = document.getElementById('btn-submit-order');
 
   if (STATE.cart.length === 0) {
     empty.style.display = 'flex';
@@ -1316,6 +1448,7 @@ function renderCart() {
     totalEl.textContent = '₩0';
     countEl.textContent = '0개 항목';
     payBtn.disabled = true;
+    if (orderBtn) orderBtn.disabled = true;
     return;
   }
 
@@ -1345,6 +1478,7 @@ function renderCart() {
   const itemCount = STATE.cart.reduce((s,i) => s + i.qty, 0);
   countEl.textContent = `${itemCount}개 항목`;
   payBtn.disabled = false;
+  if (orderBtn) orderBtn.disabled = false;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1544,6 +1678,23 @@ function createTableCard(table, x, y) {
   const elapsed = table.order_started
     ? getElapsedMin(table.order_started) + '분' : '';
 
+  // 주문 요약 (OKPOS 스타일: 첫 메뉴 + 외 N메뉴 + 합계)
+  let orderSummaryHtml = '';
+  if (table.status !== 'empty' && table._orderSummary) {
+    const s = table._orderSummary;
+    const moreLine = s.more > 0 ? `<div class="tc-more">외 ${s.more}메뉴</div>` : '';
+    orderSummaryHtml = `
+      <div class="tc-order-wrap">
+        <div class="tc-first-item">${s.first}</div>
+        ${moreLine}
+        <div class="tc-total">${fmt(s.total)}</div>
+      </div>`;
+  } else if (table.status === 'checkout') {
+    orderSummaryHtml = `<div class="table-amount" style="color:var(--rose);font-size:10px;">계산대기</div>`;
+  } else if (table.status === 'occupied' && !table._orderSummary) {
+    orderSummaryHtml = `<div class="table-amount">주문중</div>`;
+  }
+
   div.innerHTML = `
     <button class="btn-delete-table" onclick="deleteTableCard(${table.id}, event)" title="테이블 삭제">✕</button>
     <div class="table-status-dot"></div>
@@ -1551,7 +1702,7 @@ function createTableCard(table, x, y) {
     <div class="table-num">${table.table_no}</div>
     <div class="table-label">${table.seat_count}인석</div>
     ${elapsed ? `<div class="table-time">${elapsed}</div>` : ''}
-    ${table.status !== 'empty' ? `<div class="table-amount">${table.status === 'checkout' ? '계산대기' : '주문중'}</div>` : ''}
+    ${orderSummaryHtml}
   `;
 
   // 드래그 이벤트
@@ -1787,7 +1938,50 @@ async function deleteTableCard(tableId, e) {
 
 
 function tableCardClick(table) {
-  openTableDetail(table);
+  // 바로 주문 화면으로 이동
+  STATE.selectedTable = table;
+  STATE.orderType = 'dine-in';
+  STATE.currentOrderId = table.current_order_id || null;
+
+  // 주문 유형 버튼 동기화
+  document.querySelectorAll('.otype-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === 'dine-in');
+  });
+  const tableDisplay = document.getElementById('table-display');
+  tableDisplay.style.opacity = '1';
+  tableDisplay.style.pointerEvents = 'auto';
+  document.getElementById('selected-table-no').textContent = `${table.table_no}번 테이블`;
+
+  // 이미 주문 중인 테이블이면 기존 주문 아이템 장바구니로 로드
+  if (table.status !== 'empty' && table.current_order_id) {
+    STATE.cart = [];
+    renderCart();
+    showView('view-order');
+    showLoading('주문 내역 불러오는 중...');
+    apiFetch(`/api/orders/${table.current_order_id}`)
+      .then(data => {
+        const items = data.items || [];
+        STATE.cart = items.map(it => ({
+          menu_id:  it.menu_id,
+          name_ko:  it.name_ko || it.menu_name || '—',
+          price:    it.unit_price || 0,
+          qty:      it.qty || 1,
+          note:     it.note || '',
+        }));
+        renderCart();
+        showToast(`${table.table_no}번 테이블 — 기존 주문 불러옴`);
+      })
+      .catch(() => {
+        showToast(`${table.table_no}번 테이블 이어서 주문`);
+      })
+      .finally(() => hideLoading());
+  } else {
+    // 빈 테이블: 장바구니 비우고 주문뷰로
+    STATE.cart = [];
+    renderCart();
+    showView('view-order');
+    showToast(`${table.table_no}번 테이블 선택됨`);
+  }
 }
 
 // ════════════════════════════════════════════════════════════
