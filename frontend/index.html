@@ -818,6 +818,57 @@
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     테이블 상세 팝업 (배치도에서 테이블 클릭 시)
+════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="table-detail-overlay" onclick="closeTableDetailOnBg(event)">
+  <div class="table-detail-popup" id="table-detail-popup">
+
+    <!-- 헤더 -->
+    <div class="tdp-header">
+      <div class="tdp-title-wrap">
+        <div class="tdp-icon" id="tdp-icon">🍽️</div>
+        <div>
+          <div class="tdp-table-no" id="tdp-table-no">—번 테이블</div>
+          <div class="tdp-meta" id="tdp-meta">빈 자리 · 0인석</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeTableDetail()">✕</button>
+    </div>
+
+    <!-- 상태 배지 -->
+    <div class="tdp-status-row">
+      <div class="tdp-status-badge" id="tdp-status-badge">빈 자리</div>
+      <div class="tdp-elapsed" id="tdp-elapsed"></div>
+    </div>
+
+    <!-- 현재 주문 요약 (주문 중인 경우) -->
+    <div class="tdp-order-summary" id="tdp-order-summary" style="display:none;">
+      <div class="tdp-section-label">📋 현재 주문</div>
+      <div class="tdp-order-items" id="tdp-order-items"></div>
+      <div class="tdp-order-total-row">
+        <span>합계</span>
+        <span class="tdp-order-total" id="tdp-order-total">₩0</span>
+      </div>
+    </div>
+
+    <!-- 액션 버튼 -->
+    <div class="tdp-actions">
+      <!-- 직접 주문 버튼 (항상 표시) -->
+      <button class="tdp-btn-order" id="tdp-btn-order" onclick="tdpGoOrder()">
+        <span class="tdp-btn-icon">✏️</span>
+        직접 주문
+      </button>
+      <!-- 결제 버튼 (주문 중이거나 계산 대기 중일 때만 활성) -->
+      <button class="tdp-btn-pay" id="tdp-btn-pay" onclick="tdpGoPay()" disabled>
+        <span class="tdp-btn-icon">💳</span>
+        결제
+      </button>
+    </div>
+
+  </div>
+</div>
+
 
 <script>
 // ════════════════════════════════════════════════════════════
@@ -1736,19 +1787,154 @@ async function deleteTableCard(tableId, e) {
 
 
 function tableCardClick(table) {
-  if (table.status === 'empty') {
-    STATE.selectedTable = table;
-    document.getElementById('selected-table-no').textContent = `${table.table_no}번 테이블`;
-    showView('view-order');
-    showToast(`${table.table_no}번 테이블 선택됨`);
+  openTableDetail(table);
+}
+
+// ════════════════════════════════════════════════════════════
+// 테이블 상세 팝업
+// ════════════════════════════════════════════════════════════
+let _tdpTable = null;   // 현재 팝업에 열린 테이블 정보
+
+function openTableDetail(table) {
+  _tdpTable = table;
+
+  // 헤더
+  const statusEmoji = table.status === 'empty' ? '🪑'
+                    : table.status === 'checkout' ? '💳' : '🍽️';
+  document.getElementById('tdp-icon').textContent = statusEmoji;
+  document.getElementById('tdp-table-no').textContent = `${table.table_no}번 테이블`;
+  document.getElementById('tdp-meta').textContent =
+    `${table.floor || '1층'} · ${table.seat_count || 0}인석`;
+
+  // 상태 배지
+  const badge = document.getElementById('tdp-status-badge');
+  badge.textContent = table.status === 'empty' ? '빈 자리'
+                    : table.status === 'occupied' ? '주문 중'
+                    : '계산 대기';
+  badge.className = 'tdp-status-badge ' + table.status;
+
+  // 경과 시간
+  const elapsedEl = document.getElementById('tdp-elapsed');
+  if (table.order_started && table.status !== 'empty') {
+    elapsedEl.textContent = `⏱ ${getElapsedMin(table.order_started)}분 경과`;
+    elapsedEl.style.display = 'block';
   } else {
-    // 주문 중인 테이블 → 주문 이어서
-    STATE.selectedTable = table;
-    document.getElementById('selected-table-no').textContent = `${table.table_no}번 테이블`;
-    showView('view-order');
-    showToast(`${table.table_no}번 테이블 이어서 주문`);
+    elapsedEl.style.display = 'none';
+  }
+
+  // 현재 주문 요약
+  const summaryEl = document.getElementById('tdp-order-summary');
+  const itemsEl   = document.getElementById('tdp-order-items');
+  const totalEl   = document.getElementById('tdp-order-total');
+
+  if (table.status !== 'empty' && table.current_order_id) {
+    // API에서 주문 아이템 조회
+    summaryEl.style.display = 'block';
+    itemsEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">주문 내역 불러오는 중...</div>';
+    totalEl.textContent = '₩—';
+
+    apiFetch(`/api/orders/${table.current_order_id}`)
+      .then(data => {
+        const items = data.items || [];
+        if (items.length === 0) {
+          itemsEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">주문 항목 없음</div>';
+          totalEl.textContent = '₩0';
+          return;
+        }
+        let total = 0;
+        itemsEl.innerHTML = items.map(it => {
+          const sub = (it.unit_price || it.price || 0) * (it.qty || 1);
+          total += sub;
+          return `
+            <div class="tdp-order-item">
+              <span class="tdp-item-name">${it.menu_name || it.name_ko || '—'} × ${it.qty}</span>
+              <span class="tdp-item-price">${fmt(sub)}</span>
+            </div>`;
+        }).join('');
+        totalEl.textContent = fmt(total);
+      })
+      .catch(() => {
+        itemsEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">주문 내역 조회 실패</div>';
+        totalEl.textContent = '₩—';
+      });
+  } else {
+    summaryEl.style.display = 'none';
+  }
+
+  // 결제 버튼 활성화 여부
+  const payBtn = document.getElementById('tdp-btn-pay');
+  payBtn.disabled = table.status === 'empty';
+
+  // 팝업 열기
+  document.getElementById('table-detail-overlay').classList.add('active');
+}
+
+function closeTableDetail() {
+  document.getElementById('table-detail-overlay').classList.remove('active');
+  _tdpTable = null;
+}
+
+function closeTableDetailOnBg(e) {
+  if (e.target === document.getElementById('table-detail-overlay')) {
+    closeTableDetail();
   }
 }
+
+/** 직접 주문 버튼 — 주문 뷰로 이동 */
+function tdpGoOrder() {
+  if (!_tdpTable) return;
+  STATE.selectedTable = _tdpTable;
+  STATE.orderType = 'dine-in';
+  // 주문 유형 버튼 동기화
+  document.querySelectorAll('.otype-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === 'dine-in');
+  });
+  // 테이블 디스플레이 복원
+  const tableDisplay = document.getElementById('table-display');
+  tableDisplay.style.opacity = '1';
+  tableDisplay.style.pointerEvents = 'auto';
+  document.getElementById('selected-table-no').textContent = `${_tdpTable.table_no}번 테이블`;
+  closeTableDetail();
+  showView('view-order');
+  showToast(`${_tdpTable.table_no}번 테이블 직접 주문`);
+}
+
+/** 결제 버튼 — 결제 모달 열기 (장바구니에 현재 주문 로드) */
+async function tdpGoPay() {
+  if (!_tdpTable || _tdpTable.status === 'empty') return;
+
+  showLoading('주문 정보 불러오는 중...');
+  try {
+    // 주문 아이템을 장바구니로 로드
+    if (_tdpTable.current_order_id) {
+      const data = await apiFetch(`/api/orders/${_tdpTable.current_order_id}`);
+      const items = data.items || [];
+      STATE.cart = items.map(it => ({
+        menu_id:  it.menu_id,
+        name_ko:  it.menu_name || it.name_ko || '—',
+        price:    it.unit_price || it.price || 0,
+        qty:      it.qty || 1,
+        note:     it.note || '',
+      }));
+      STATE.currentOrderId = _tdpTable.current_order_id;
+    }
+    STATE.selectedTable = _tdpTable;
+    document.getElementById('selected-table-no').textContent = `${_tdpTable.table_no}번 테이블`;
+    renderCart();
+    closeTableDetail();
+    hideLoading();
+    openPaymentModal();
+  } catch (err) {
+    hideLoading();
+    // API 실패 시 주문 뷰로만 이동
+    STATE.selectedTable = _tdpTable;
+    document.getElementById('selected-table-no').textContent = `${_tdpTable.table_no}번 테이블`;
+    closeTableDetail();
+    showView('view-order');
+    showToast('주문 내역 로드 실패 — 직접 확인해 주세요.', true);
+  }
+}
+
 
 function renderTablePicker(tables) {
   const grid = document.getElementById('table-pick-grid');

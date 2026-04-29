@@ -1520,3 +1520,207 @@ body {
   .admin-menu-grid { grid-template-columns: repeat(2, 1fr); }
   .floorplan-canvas .table-card { width: 84px; min-height: 72px; }
 }
+
+/* ================================================================
+   테이블 상세 팝업 (배치도 → 테이블 클릭)
+   ================================================================ */
+.table-detail-popup {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(14,207,177,0.07);
+  animation: tdp-in 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes tdp-in {
+  from { transform: scale(0.88) translateY(12px); opacity: 0; }
+  to   { transform: scale(1)    translateY(0);    opacity: 1; }
+}
+
+/* 헤더 */
+.tdp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.tdp-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tdp-icon {
+  font-size: 34px;
+  line-height: 1;
+  width: 52px; height: 52px;
+  background: var(--card2);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border2);
+  flex-shrink: 0;
+}
+.tdp-table-no {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text1);
+  letter-spacing: -0.3px;
+}
+.tdp-meta {
+  font-size: 11.5px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+/* 상태 배지 줄 */
+.tdp-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.tdp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.tdp-status-badge.empty    { background: var(--green3); color: var(--green); border: 1px solid rgba(46,204,113,0.3); }
+.tdp-status-badge.occupied { background: var(--amber3); color: var(--amber); border: 1px solid rgba(243,156,18,0.3); }
+.tdp-status-badge.checkout { background: var(--rose3);  color: var(--rose);  border: 1px solid rgba(245,86,107,0.3); }
+
+.tdp-elapsed {
+  font-size: 11.5px;
+  color: var(--text3);
+  font-family: 'DM Mono', monospace;
+  display: none;
+}
+
+/* 주문 요약 영역 */
+.tdp-order-summary {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.tdp-section-label {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+.tdp-order-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.tdp-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--card2);
+  border-radius: 7px;
+  border: 1px solid var(--border);
+}
+.tdp-item-name {
+  font-size: 13px;
+  color: var(--text1);
+  font-weight: 500;
+}
+.tdp-item-price {
+  font-size: 13px;
+  font-family: 'DM Mono', monospace;
+  color: var(--gold);
+  font-weight: 600;
+}
+.tdp-order-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 10px 2px;
+  font-size: 12px;
+  color: var(--text3);
+}
+.tdp-order-total {
+  font-family: 'DM Mono', monospace;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--teal);
+}
+
+/* 액션 버튼 영역 */
+.tdp-actions {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+/* 직접 주문 버튼 */
+.tdp-btn-order {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 14px;
+  background: var(--card2);
+  border: 1.5px solid var(--teal);
+  border-radius: 12px;
+  color: var(--teal);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif;
+  transition: all 0.18s ease;
+}
+.tdp-btn-order:hover {
+  background: var(--teal3);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(14,207,177,0.25);
+}
+.tdp-btn-order:active { transform: scale(0.97); }
+
+/* 결제 버튼 */
+.tdp-btn-pay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+  border: none;
+  border-radius: 12px;
+  color: var(--navy);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 14px rgba(245,166,35,0.3);
+}
+.tdp-btn-pay:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(245,166,35,0.4);
+}
+.tdp-btn-pay:active { transform: scale(0.97); }
+.tdp-btn-pay:disabled {
+  background: var(--card2);
+  border: 1.5px solid var(--border2);
+  color: var(--text3);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.tdp-btn-icon { font-size: 18px; line-height: 1; }
