@@ -2307,11 +2307,25 @@ async function confirmPayment() {
   const total = getCartTotal();
   const method = STATE.payMethod;
 
-  // 유효성 검사
+  // ── 유효성 검사 ──────────────────────────────────────────
+  if (STATE.cart.length === 0) {
+    showToast('장바구니가 비어 있습니다.', true);
+    return;
+  }
+
   if (method === 'cash') {
     const received = parseInt(document.getElementById('cash-received-input').value) || 0;
     if (received < total) {
-      showToast('받은 금액이 부족합니다.', true); return;
+      showToast('받은 금액이 부족합니다.', true);
+      return;
+    }
+  }
+  if (method === 'mixed') {
+    const mc = parseInt(document.getElementById('mixed-cash').value) || 0;
+    const mk = parseInt(document.getElementById('mixed-card').value) || 0;
+    if (mc + mk < total) {
+      showToast('혼합 결제 금액 합계가 부족합니다.', true);
+      return;
     }
   }
 
@@ -2320,9 +2334,10 @@ async function confirmPayment() {
   btn.textContent = '처리 중...';
 
   try {
-    // 1. 주문 생성 (아직 주문이 없는 경우)
+    // ── 1. 주문 생성 (아직 주문이 없는 경우) ─────────────
     let orderId = STATE.currentOrderId;
     if (!orderId) {
+      if (STATE.cart.length === 0) throw new Error('주문 항목이 없습니다.');
       const orderData = await apiFetch('/api/orders', {
         method: 'POST',
         body: JSON.stringify({
@@ -2343,31 +2358,33 @@ async function confirmPayment() {
       STATE.currentOrderId = orderId;
     }
 
-    // 2. 결제 처리
+    if (!orderId) throw new Error('주문 ID를 생성할 수 없습니다.');
+
+    // ── 2. 결제 처리 ──────────────────────────────────────
     const cashReceived = parseInt(document.getElementById('cash-received-input').value) || 0;
-    const cardApproval = document.getElementById('card-approval-no').value;
-    const cardCompany  = document.getElementById('card-company').value;
+    const cardApproval = document.getElementById('card-approval-no').value.trim();
+    const cardCompany  = document.getElementById('card-company').value.trim();
     const mixedCash    = parseInt(document.getElementById('mixed-cash').value) || 0;
     const mixedCard    = parseInt(document.getElementById('mixed-card').value) || 0;
 
     const payBody = {
-      order_id:      orderId,
-      branch_id:     STATE.branch_id,
+      order_id:         orderId,
+      branch_id:        STATE.branch_id,
       method,
-      total_amount:  total,
-      cash_amount:   method === 'cash' ? total : (method === 'mixed' ? mixedCash : 0),
-      cash_received: method === 'cash' ? cashReceived : 0,
-      card_amount:   method === 'card' ? total : (method === 'mixed' ? mixedCard : 0),
-      card_approval_no: method !== 'cash' ? cardApproval : null,
-      card_company:  method !== 'cash' ? cardCompany : null,
-      member_id:     STATE.memberFound?.id || null,
-      staff_id:      STATE.staff_id
+      total_amount:     total,
+      cash_amount:      method === 'cash' ? total : (method === 'mixed' ? mixedCash : 0),
+      cash_received:    method === 'cash' ? cashReceived : 0,
+      card_amount:      method === 'card' ? total : (method === 'mixed' ? mixedCard : 0),
+      card_approval_no: method !== 'cash' ? (cardApproval || null) : null,
+      card_company:     method !== 'cash' ? (cardCompany  || null) : null,
+      member_id:        STATE.memberFound?.id || null,
+      staff_id:         STATE.staff_id
     };
 
     if (method === 'mixed') {
       payBody.split_payments = [
         { method: 'cash', amount: mixedCash },
-        { method: 'card', amount: mixedCard, card_approval_no: cardApproval }
+        { method: 'card', amount: mixedCard, card_approval_no: cardApproval || null }
       ];
     }
 
@@ -2376,30 +2393,50 @@ async function confirmPayment() {
       body: JSON.stringify(payBody)
     });
 
-    // 3. 성공 처리
+    // ── 3. 성공 처리 ──────────────────────────────────────
     closePaymentModal();
-    const change = payResult.change || 0;
-    let successMsg = `결제 완료! ${fmt(total)}`;
-    if (method === 'cash' && change > 0) successMsg += ` — 거스름돈: ${fmt(change)}`;
 
+    const change = payResult.change || 0;
+    let successMsg = `✅ 결제 완료  ${fmt(total)}`;
+    if (method === 'cash' && change > 0) successMsg += `  |  거스름돈: ${fmt(change)}`;
     showToast(successMsg);
 
-    // 카트 초기화
+    // 테이블 상태를 로컬 STATE에서도 empty로 초기화
+    if (STATE.selectedTable) {
+      const t = STATE.tables.find(t => t.id === STATE.selectedTable.id);
+      if (t) {
+        t.status = 'empty';
+        t.current_order_id = null;
+        t._orderSummary = null;
+      }
+      updateOccupiedBadge(STATE.tables);
+    }
+
+    // 장바구니 / 테이블 상태 초기화
     STATE.cart = [];
     STATE.currentOrderId = null;
-    STATE.selectedTable = null;
-    STATE.personCount = 1;
+    STATE.selectedTable  = null;
+    STATE.personCount    = 1;
+    STATE.memberFound    = null;
     document.getElementById('selected-table-no').textContent = '테이블 미선택';
     document.getElementById('person-count').textContent = '1';
+    document.getElementById('member-phone').value = '';
+    document.getElementById('member-info').classList.remove('found');
     renderCart();
 
+    // ── 4. 마감 화면으로 이동하여 매출 집계 갱신 ──────────
+    showView('view-closing');
+    loadClosingData();
+
   } catch (err) {
+    console.error('[결제 오류]', err);
     showToast(`결제 실패: ${err.message}`, true);
   } finally {
     btn.disabled = false;
     btn.textContent = '결제 완료';
   }
 }
+
 
 // ════════════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════════════
