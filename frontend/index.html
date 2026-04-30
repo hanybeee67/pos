@@ -1034,9 +1034,9 @@ async function pinConfirm() {
 
     await loadMenus();
     switchScreen('screen-main');
-    showView('view-order');
+    showView('view-tables');   // 로그인 후 첫 화면: 테이블 배치도
     startClock();
-    showToast(`${STATE.staff_name}님, 환영합니다! 🏔️`);
+    showToast(`${STATE.staff_name}님, 환영합니다! ⛰️`);
   } catch (err) {
     document.getElementById('login-error').textContent = err.message;
     pinValue = ''; updatePinDots();
@@ -2424,9 +2424,10 @@ async function confirmPayment() {
     document.getElementById('member-info').classList.remove('found');
     renderCart();
 
-    // ── 4. 마감 화면으로 이동하여 매출 집계 갱신 ──────────
-    showView('view-closing');
-    loadClosingData();
+    // ── 4. 마감 데이터 백그라운드 갱신 (화면 전환 없이) + 테이블 배치도로 이동 ──
+    loadClosingData();            // 숫자만 갱신 (화면 표시 없음)
+    showView('view-tables');      // 결제 완료 후 테이블 배치도로 이동
+    loadTables();                 // 테이블 상태 최신화
 
   } catch (err) {
     console.error('[결제 오류]', err);
