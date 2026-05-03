@@ -1485,7 +1485,7 @@ body {
   background: var(--card2); border: 1px solid var(--teal);
   border-radius: 30px; padding: 10px 24px;
   font-size: 13.5px; font-weight: 600; color: var(--teal);
-  z-index: 9999; opacity: 0;
+  z-index: 9999; opacity: 0; pointer-events: none;
   transition: all 0.3s;
   white-space: nowrap;
   box-shadow: 0 8px 24px rgba(14,207,177,0.25);
