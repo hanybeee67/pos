@@ -1342,8 +1342,9 @@ async function submitOrder() {
         t.current_order_id = STATE.currentOrderId;
         const total = STATE.cart.reduce((s, i) => s + i.price * i.qty, 0);
         const first = STATE.cart[0]?.name_ko || '';
-        const more  = STATE.cart.reduce((s, i) => s + i.qty, 0) - (STATE.cart[0]?.qty || 0);
-        t._orderSummary = { first, more, total };
+        const first_qty = STATE.cart[0]?.qty || 1;
+        const more  = STATE.cart.reduce((s, i) => s + i.qty, 0) - first_qty;
+        t._orderSummary = { first, first_qty, more, total };
         // 배치도에 있다면 리렌더
         if (document.getElementById('view-tables').style.display !== 'none') {
           renderFloorPlan();
@@ -1355,8 +1356,16 @@ async function submitOrder() {
     // 주방 주문서 프린트
     printKitchenOrder(STATE.selectedTable, STATE.cart);
 
-    // 주문 후 장바구니 유지 (추가주문 가능하도록)
-    // 필요시 초기화: STATE.cart = []; renderCart();
+    // 주문 성공 후 테이블 배치도로 돌아가기
+    STATE.cart = [];
+    STATE.currentOrderId = null;
+    STATE.selectedTable = null;
+    document.getElementById('selected-table-no').textContent = '테이블 미선택';
+    renderCart();
+    
+    // 화면을 테이블 배치도로 전환하고 다시 그리기
+    showView('view-tables');
+    renderFloorPlan();
 
   } catch (err) {
     showToast('주문 실패: ' + err.message, true);
@@ -1678,16 +1687,21 @@ function createTableCard(table, x, y) {
   const elapsed = table.order_started
     ? getElapsedMin(table.order_started) + '분' : '';
 
-  // 주문 요약 (OKPOS 스타일: 첫 메뉴 + 외 N메뉴 + 합계)
+  // 주문 요약 (OKPOS 스타일: 파란색 박스, 두 줄 정렬)
   let orderSummaryHtml = '';
   if (table.status !== 'empty' && table._orderSummary) {
     const s = table._orderSummary;
-    const moreLine = s.more > 0 ? `<div class="tc-more">외 ${s.more}메뉴</div>` : '';
+    const moreLine = s.more > 0 ? `외 ${s.more}메뉴` : '&nbsp;';
     orderSummaryHtml = `
       <div class="tc-order-wrap">
-        <div class="tc-first-item">${s.first}</div>
-        ${moreLine}
-        <div class="tc-total">${fmt(s.total)}</div>
+        <div class="tc-row">
+          <span class="tc-first-item">${s.first}</span>
+          <span class="tc-qty">${s.first_qty || 1}</span>
+        </div>
+        <div class="tc-row">
+          <span class="tc-more">${moreLine}</span>
+          <span class="tc-total">${fmt(s.total)}</span>
+        </div>
       </div>`;
   } else if (table.status === 'checkout') {
     orderSummaryHtml = `<div class="table-amount" style="color:var(--rose);font-size:10px;">계산대기</div>`;

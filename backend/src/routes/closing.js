@@ -77,6 +77,24 @@ router.post('/daily', async (req, res, next) => {
        closingData.person_count, JSON.stringify(byCategory), staff_id || null]
     );
 
+    // 미결제 주문(pending, cooking, served)을 'cancelled' 처리하고 모든 테이블 비우기
+    await db.query(
+      `UPDATE orders SET status = 'cancelled', updated_at = NOW() 
+       WHERE branch_id = $1 AND status NOT IN ('paid', 'cancelled')`, 
+      [branch_id]
+    );
+    await db.query(
+      `UPDATE tables SET status = 'empty', current_order_id = NULL 
+       WHERE branch_id = $1`, 
+      [branch_id]
+    );
+
+    // WebSocket으로 클라이언트에게 테이블 초기화 알림
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`branch-${branch_id}`).emit('tables-cleared');
+    }
+
     // 재무관리 시스템으로 자동 전송
     const revenueResult = await sendDailySales(closingData);
     const syncOk = !revenueResult?.error;
