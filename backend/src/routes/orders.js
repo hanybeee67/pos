@@ -49,6 +49,29 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/orders/:id — 특정 주문 상세 조회 (아이템 포함)
+router.get('/:id', async (req, res, next) => {
+  try {
+    const orderId = req.params.id;
+    const orderResult = await db.query(`SELECT * FROM orders WHERE id = $1`, [orderId]);
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: '주문을 찾을 수 없습니다.' });
+    }
+    const order = orderResult.rows[0];
+
+    const itemsResult = await db.query(
+      `SELECT oi.*, m.name_ko, m.name_en 
+       FROM order_items oi
+       JOIN menus m ON m.id = oi.menu_id
+       WHERE oi.order_id = $1`,
+      [orderId]
+    );
+    order.items = itemsResult.rows;
+
+    res.json(order);
+  } catch (err) { next(err); }
+});
+
 // POST /api/orders — 주문 생성
 router.post('/', async (req, res, next) => {
   try {
