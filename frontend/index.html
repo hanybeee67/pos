@@ -2333,6 +2333,8 @@ async function confirmPayment() {
   btn.disabled = true;
   btn.textContent = '처리 중...';
 
+  alert('결제 요청을 서버로 전송합니다.');
+
   try {
     // ── 1. 주문 생성 (아직 주문이 없는 경우) ─────────────
     let orderId = STATE.currentOrderId;
@@ -2430,6 +2432,7 @@ async function confirmPayment() {
     loadTables();                 // 테이블 상태 최신화
 
   } catch (err) {
+    alert('에러 발생: ' + err.message);
     console.error('[결제 오류]', err);
     showToast(`결제 실패: ${err.message}`, true);
   } finally {
