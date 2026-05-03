@@ -14,7 +14,7 @@ router.get('/', async (req, res, next) => {
        FROM tables t
        LEFT JOIN orders o ON o.id = t.current_order_id AND o.status NOT IN ('paid','cancelled')
        WHERE t.branch_id = $1
-       ORDER BY t.floor, t.table_no::int`,
+       ORDER BY t.floor, t.table_no`,
       [branch_id]
     );
     res.json(result.rows);
