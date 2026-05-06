@@ -1628,7 +1628,7 @@ function autoGridUnplaced(tables) {
     let placed = floorTables.filter(t => t.pos_x > 0 || t.pos_y > 0);
     let unplaced = floorTables.filter(t => t.pos_x === 0 && t.pos_y === 0);
     const COLS = 5;
-    const GAP_X = 120, GAP_Y = 110, START_X = 20, START_Y = 20;
+    const GAP_X = 170, GAP_Y = 140, START_X = 30, START_Y = 30;
     unplaced.forEach((t, idx) => {
       const col = idx % COLS;
       const row = Math.floor(idx / COLS);
