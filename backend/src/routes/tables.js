@@ -78,24 +78,23 @@ router.post('/', async (req, res, next) => {
 router.patch('/:id', async (req, res, next) => {
   try {
     const { table_no, floor, seat_count, pos_x, pos_y } = req.body;
+    const updates = [];
+    const values = [req.params.id];
+    let idx = 2;
+
+    if (table_no !== undefined) { updates.push(`table_no = $${idx++}`); values.push(table_no); }
+    if (floor !== undefined) { updates.push(`floor = $${idx++}`); values.push(floor); }
+    if (seat_count !== undefined) { updates.push(`seat_count = $${idx++}`); values.push(seat_count); }
+    if (pos_x !== undefined) { updates.push(`pos_x = $${idx++}`); values.push(pos_x); }
+    if (pos_y !== undefined) { updates.push(`pos_y = $${idx++}`); values.push(pos_y); }
+
+    if (updates.length === 0) return res.json({});
+
     const result = await db.query(
-      `UPDATE tables SET
-         table_no   = COALESCE($2, table_no),
-         floor      = COALESCE($3, floor),
-         seat_count = COALESCE($4, seat_count),
-         pos_x      = COALESCE($5, pos_x),
-         pos_y      = COALESCE($6, pos_y)
-       WHERE id = $1 RETURNING *`,
-      [
-        req.params.id,
-        table_no !== undefined ? table_no : null,
-        floor !== undefined ? floor : null,
-        seat_count !== undefined ? seat_count : null,
-        pos_x !== undefined ? pos_x : null,
-        pos_y !== undefined ? pos_y : null
-      ]
+      `UPDATE tables SET ${updates.join(', ')} WHERE id = $1 RETURNING *`,
+      values
     );
-    res.json(result.rows[0]);
+    res.json(result.rows[0] || {});
   } catch (err) { next(err); }
 });
 
