@@ -165,4 +165,18 @@ router.patch('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// DELETE /api/tables/:id — 테이블 삭제
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `DELETE FROM tables WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: '테이블을 찾을 수 없습니다.' });
+    }
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

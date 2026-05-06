@@ -1964,18 +1964,17 @@ async function deleteTableCard(tableId, e) {
   if (!confirm(`테이블 ${t?.table_no}을(를) 삭제하시겠습니까?`)) return;
 
   try {
-    // 백엔드에 삭제 API가 없으면 비활성화용 PATCH (있으면 DELETE)
-    await apiFetch(`/api/tables/${tableId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ is_active: false }),
-    }).catch(() => null);
-  } catch {}
+    await apiFetch(`/api/tables/${tableId}`, { method: 'DELETE' });
+  } catch (err) {
+    showToast('삭제 실패: ' + err.message, true);
+    return;
+  }
 
   STATE.tables = STATE.tables.filter(t => t.id !== tableId);
   delete TABLE_LAYOUT.pendingPos[tableId];
   buildFloorTabs(STATE.tables);
   renderFloorPlan();
-  showToast('테이블이 삭제되었습니다.');
+  showToast(`테이블 ${t?.table_no}이(가) 삭제되었습니다.`);
 }
 
 
