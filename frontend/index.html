@@ -1557,7 +1557,16 @@ function updateOccupiedBadge(tables) {
 async function loadTables(forPicker = false) {
   try {
     const data = await apiFetch(`/api/tables?branch_id=${STATE.branch_id}`);
-    STATE.tables = data;
+    STATE.tables = data.map(t => {
+      if (t.status !== 'empty' && t.first_item_name) {
+        const total = parseInt(t.total_price) || 0;
+        const first = t.first_item_name;
+        const first_qty = parseInt(t.first_item_qty) || 1;
+        const more = (parseInt(t.total_qty) || 0) - first_qty;
+        t._orderSummary = { first, first_qty, more, total };
+      }
+      return t;
+    });
   } catch {
     // 오프라인 폴백 — OKPOS 실제 배치 기준
     STATE.tables = [

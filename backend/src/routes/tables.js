@@ -10,7 +10,31 @@ router.get('/', async (req, res, next) => {
               o.id       as order_id,
               o.status   as order_status,
               o.created_at as order_started,
-              (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) as item_count
+              (
+                SELECT m.name_ko
+                FROM order_items oi
+                JOIN menus m ON m.id = oi.menu_id
+                WHERE oi.order_id = o.id
+                ORDER BY oi.id ASC
+                LIMIT 1
+              ) as first_item_name,
+              (
+                SELECT oi.qty
+                FROM order_items oi
+                WHERE oi.order_id = o.id
+                ORDER BY oi.id ASC
+                LIMIT 1
+              ) as first_item_qty,
+              (
+                SELECT SUM(qty)
+                FROM order_items oi
+                WHERE oi.order_id = o.id
+              ) as total_qty,
+              (
+                SELECT SUM(oi.unit_price * oi.qty)
+                FROM order_items oi
+                WHERE oi.order_id = o.id
+              ) as total_price
        FROM tables t
        LEFT JOIN orders o ON o.id = t.current_order_id AND o.status NOT IN ('paid','cancelled')
        WHERE t.branch_id = $1
