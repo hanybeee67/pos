@@ -1537,8 +1537,8 @@ const TABLE_LAYOUT = {
   drag: null,            // 현재 드래그 중인 정보
 };
 
-const CARD_W = 100;   // 카드 너비 (px) — CSS와 동일
-const CARD_H = 84;    // 카드 높이 (px)
+const CARD_W = 140;   // 카드 너비 (px) — CSS .floorplan-canvas .table-card { width: 140px }
+const CARD_H = 110;   // 카드 높이 (px)
 
 function updateOccupiedBadge(tables) {
   const n = tables.filter(t => t.status === 'occupied' || t.status === 'checkout').length;
@@ -1859,7 +1859,7 @@ async function saveLayout() {
       )
     );
 
-    // 로컬 state 반영 (성공 여부 무관)
+    // 로컬 state에 저장된 좌표 반영 (DB 재로드 없이 직접 적용)
     Object.entries(pending).forEach(([id, pos]) => {
       const t = STATE.tables.find(t => t.id === parseInt(id));
       if (t) { t.pos_x = pos.x; t.pos_y = pos.y; }
@@ -1871,10 +1871,18 @@ async function saveLayout() {
       showToast(`⚠️ ${failCount}개 테이블 저장 실패 (서버 연결 확인)`, true);
     } else {
       showToast(`✅ 배치가 저장되었습니다.`);
-      // DB에서 최신 좌표를 다시 불러와서 확인
-      await loadTables();
-      // 편집 모드 종료
-      toggleEditMode();
+      // 편집 모드 UI 종료 (loadTables 없이 로컬 state로 렌더)
+      TABLE_LAYOUT.editMode = false;
+      const editBtn = document.getElementById('btn-edit-layout');
+      const banner  = document.getElementById('edit-mode-banner');
+      const addBtn  = document.getElementById('btn-add-table');
+      const canvas  = document.getElementById('floorplan-canvas');
+      if (editBtn) { editBtn.classList.remove('active'); editBtn.textContent = '✏️ 배치 편집'; }
+      if (banner)  banner.style.display  = 'none';
+      if (addBtn)  addBtn.style.display  = 'none';
+      if (btn)     btn.style.display     = 'none';
+      if (canvas)  canvas.classList.remove('edit-mode');
+      renderFloorPlan(); // 로컬 state 기준으로 화면 갱신
     }
   } catch (err) {
     showToast('저장 실패: ' + err.message, true);
