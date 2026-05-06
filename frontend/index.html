@@ -1723,7 +1723,6 @@ function createTableCard(table, x, y) {
     <div class="table-status-dot"></div>
     ${table.source === 'torder' ? '<div class="table-source">T</div>' : ''}
     <div class="table-num">${table.table_no}</div>
-    <div class="table-label">${table.seat_count}인석</div>
     ${elapsed ? `<div class="table-time">${elapsed}</div>` : ''}
     ${orderSummaryHtml}
   `;

@@ -1748,15 +1748,19 @@ body {
    테이블 카드 주문 요약 (OKPOS 스타일)
    ================================================================ */
 .tc-order-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
-  margin-top: 3px;
   background: #3B98D9;
   color: white;
-  padding: 4px;
+  padding: 5px 6px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  border-bottom-left-radius: calc(var(--radius) - 2px);
+  border-bottom-right-radius: calc(var(--radius) - 2px);
 }
 .tc-row {
   display: flex;
@@ -1765,24 +1769,28 @@ body {
   width: 100%;
 }
 .tc-first-item {
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 10.5px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 60px;
+  max-width: 65%;
+  color: #fff;
 }
 .tc-qty {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
+  color: #fff;
 }
 .tc-more {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 500;
+  color: #fff;
 }
 .tc-total {
   font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 800;
   text-align: right;
+  color: #fff;
 }
