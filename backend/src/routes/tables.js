@@ -86,7 +86,14 @@ router.patch('/:id', async (req, res, next) => {
          pos_x      = COALESCE($5, pos_x),
          pos_y      = COALESCE($6, pos_y)
        WHERE id = $1 RETURNING *`,
-      [req.params.id, table_no, floor, seat_count, pos_x, pos_y]
+      [
+        req.params.id,
+        table_no !== undefined ? table_no : null,
+        floor !== undefined ? floor : null,
+        seat_count !== undefined ? seat_count : null,
+        pos_x !== undefined ? pos_x : null,
+        pos_y !== undefined ? pos_y : null
+      ]
     );
     res.json(result.rows[0]);
   } catch (err) { next(err); }
