@@ -1617,7 +1617,7 @@ async function loadTables(forPicker = false) {
   if (forPicker) renderTablePicker(STATE.tables);
 }
 
-/** pos_x=0 AND pos_y=0 인 테이블에 기본 그리드 좌표 부여 */
+/** DB에서 좌표가 없는(null 또는 0) 테이블에만 기본 그리드 좌표 부여 */
 function autoGridUnplaced(tables) {
   const byFloor = {};
   tables.forEach(t => {
@@ -1625,8 +1625,8 @@ function autoGridUnplaced(tables) {
     byFloor[t.floor].push(t);
   });
   Object.values(byFloor).forEach(floorTables => {
-    let placed = floorTables.filter(t => t.pos_x > 0 || t.pos_y > 0);
-    let unplaced = floorTables.filter(t => t.pos_x === 0 && t.pos_y === 0);
+    // pos_x가 null/undefined/0이면 아직 배치 안된 것으로 처리 (DB default = 0)
+    let unplaced = floorTables.filter(t => !t.pos_x && !t.pos_y);
     const COLS = 5;
     const GAP_X = 170, GAP_Y = 140, START_X = 30, START_Y = 30;
     unplaced.forEach((t, idx) => {
@@ -1845,24 +1845,37 @@ async function saveLayout() {
   btn.disabled = true;
   btn.textContent = '저장 중...';
 
+  let failCount = 0;
   try {
     await Promise.all(
       Object.entries(pending).map(([id, pos]) =>
         apiFetch(`/api/tables/${id}`, {
           method: 'PATCH',
           body: JSON.stringify({ pos_x: pos.x, pos_y: pos.y }),
-        }).catch(() => null)  // 오프라인 무시
+        }).catch(err => {
+          console.error(`[테이블 ${id} 저장 실패]`, err);
+          failCount++;
+        })
       )
     );
 
-    // 로컬 state 반영
+    // 로컬 state 반영 (성공 여부 무관)
     Object.entries(pending).forEach(([id, pos]) => {
       const t = STATE.tables.find(t => t.id === parseInt(id));
       if (t) { t.pos_x = pos.x; t.pos_y = pos.y; }
     });
 
     TABLE_LAYOUT.pendingPos = {};
-    showToast(`✅ 배치가 저장되었습니다.`);
+
+    if (failCount > 0) {
+      showToast(`⚠️ ${failCount}개 테이블 저장 실패 (서버 연결 확인)`, true);
+    } else {
+      showToast(`✅ 배치가 저장되었습니다.`);
+      // DB에서 최신 좌표를 다시 불러와서 확인
+      await loadTables();
+      // 편집 모드 종료
+      toggleEditMode();
+    }
   } catch (err) {
     showToast('저장 실패: ' + err.message, true);
   } finally {
